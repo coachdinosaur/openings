@@ -1,0 +1,17 @@
+# Dependencies and generated application output
+app/node_modules/
+app/.vinext/
+app/.wrangler/
+app/dist/
+app/.next/
+app/coverage/
+app/tsconfig.tsbuildinfo
+
+# Python caches
+**/__pycache__/
+*.py[cod]
+
+# Temporary and machine-local files
+tmp/
+.env*
+.DS_Store

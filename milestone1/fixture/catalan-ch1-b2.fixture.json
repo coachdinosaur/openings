@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "fixture_id": "catalan.chapter1.b2.prototype",
+  "status": "proposed",
+  "source": {
+    "logical_document_id": "catalan.chapter1",
+    "filename": "Chapter1_Catalan.pdf",
+    "bytes": 1648005,
+    "page_count": 17,
+    "sha256": "3F6E9E6C1DCDAE42D0AC67417924B5D118B30F1536706B847D488D1908681E8A"
+  },
+  "boundaries": {
+    "start": {
+      "status": "source-verified",
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "anchor_text": "B2) 8...Bb4",
+      "bbox_points": {
+        "x0": 111.1,
+        "top": 367.6,
+        "x1": 161.4,
+        "bottom": 378.0
+      },
+      "evidence_region_id": "b2-heading"
+    },
+    "end": {
+      "status": "source-verified",
+      "page_index": 7,
+      "pdf_page": 8,
+      "printed_page": 14,
+      "anchor_text": "C) 4...c5",
+      "boundary_rule": "Exclude the end anchor and all following content.",
+      "bbox_points": {
+        "x0": 118.2,
+        "top": 394.6,
+        "x1": 154.3,
+        "bottom": 405.0
+      },
+      "evidence_region_id": "c-boundary"
+    }
+  },
+  "reading_regions": [
+    {
+      "region_id": "b2-page13-left",
+      "status": "source-verified",
+      "order": 1,
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 367.6,
+        "x1": 235.0,
+        "bottom": 640.0
+      }
+    },
+    {
+      "region_id": "b2-page13-right",
+      "status": "source-verified",
+      "order": 2,
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "bbox_points": {
+        "x0": 235.0,
+        "top": 60.0,
+        "x1": 440.0,
+        "bottom": 640.0
+      }
+    },
+    {
+      "region_id": "b2-page14-left",
+      "status": "source-verified",
+      "order": 3,
+      "page_index": 7,
+      "pdf_page": 8,
+      "printed_page": 14,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 50.0,
+        "x1": 235.0,
+        "bottom": 394.5
+      }
+    }
+  ],
+  "source_context": {
+    "status": "source-verified",
+    "description": "B2 move context confirmed from the variation index, B-section body, branch declaration, and B2 heading; legality is corroboration rather than source evidence.",
+    "manual_transcription": "1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 c6 5.Bg2 Nbd7 6.O-O Bd6 7.Nfd2! O-O 8.Nc3 Bb4",
+    "source_evidence_region_ids": [
+      "variation-index-b",
+      "b-body-entry",
+      "b-branch-declaration",
+      "b2-heading"
+    ]
+  },
+  "derived_position": {
+    "status": "deterministically derived",
+    "after": "8...Bb4",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p4/1bPP4/2N3P1/PP1NPPBP/R1BQ1RK1 w - - 8 9",
+    "derivation_moves_san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "e6",
+      "g3",
+      "d5",
+      "Nf3",
+      "c6",
+      "Bg2",
+      "Nbd7",
+      "O-O",
+      "Bd6",
+      "Nfd2",
+      "O-O",
+      "Nc3",
+      "Bb4"
+    ],
+    "source_annotations": [
+      {
+        "after": "7.Nfd2",
+        "punctuation": "!",
+        "source_region_id": "variation-index-b"
+      }
+    ],
+    "validation": {
+      "tool": "python-chess",
+      "result": "legal"
+    },
+    "source_evidence_region_ids": [
+      "variation-index-b",
+      "b-body-entry",
+      "b-branch-declaration",
+      "b2-heading"
+    ]
+  },
+  "diagrams": [
+    {
+      "diagram_id": "B2-D01",
+      "association_status": "source-verified",
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "pdf_image_object": "Im2",
+      "bbox_points": {
+        "x0": 62.41,
+        "top": 390.72,
+        "x1": 210.25,
+        "bottom": 551.04
+      },
+      "crop_inventory_id": "B2-D01",
+      "association_evidence": [
+        "Immediately follows the B2 heading in the left-column reading order.",
+        "Precedes the prose stating that the position demands accuracy from White.",
+        "Precedes the first B2 move 9.e4."
+      ],
+      "expected_role": {
+        "status": "proposed",
+        "description": "Starting position after 8...Bb4"
+      },
+      "board_identity": {
+        "status": "unresolved"
+      }
+    },
+    {
+      "diagram_id": "B2-D02",
+      "association_status": "source-verified",
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "pdf_image_object": "Im1",
+      "bbox_points": {
+        "x0": 266.89,
+        "top": 306.24,
+        "x1": 398.41,
+        "bottom": 430.08
+      },
+      "crop_inventory_id": "B2-D02",
+      "association_evidence": [
+        "Occurs within the B2 right-column continuation.",
+        "Follows the line ending 13.exd5 Nxd5 and the phrase about choosing the best knight move.",
+        "Precedes 14.Nb3!N."
+      ],
+      "expected_role": {
+        "status": "proposed",
+        "description": "Position after 13...Nxd5"
+      },
+      "board_identity": {
+        "status": "unresolved"
+      }
+    },
+    {
+      "diagram_id": "B2-D03",
+      "association_status": "source-verified",
+      "page_index": 7,
+      "pdf_page": 8,
+      "printed_page": 14,
+      "pdf_image_object": "Im0",
+      "bbox_points": {
+        "x0": 43.21,
+        "top": 189.11,
+        "x1": 215.05,
+        "bottom": 380.15
+      },
+      "crop_inventory_id": "B2-D03",
+      "association_evidence": [
+        "Occurs in the continuing B2 left column on printed page 14.",
+        "Follows 13.Ne4 cxd5 14.cxd5.",
+        "Precedes the continuation beginning 14...Qb6 and the C-section boundary."
+      ],
+      "expected_role": {
+        "status": "proposed",
+        "description": "Position after 14.cxd5"
+      },
+      "board_identity": {
+        "status": "unresolved"
+      }
+    }
+  ],
+  "evidence_regions": [
+    {
+      "region_id": "variation-index-b",
+      "status": "source-verified",
+      "page_index": 0,
+      "pdf_page": 1,
+      "printed_page": 7,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 330.0,
+        "x1": 445.0,
+        "bottom": 385.0
+      },
+      "crop_path": "milestone1/source-renders/crops/variation-index-b.png",
+      "purpose": "Complete B variation-index sequence and B2 label."
+    },
+    {
+      "region_id": "b-body-entry",
+      "status": "source-verified",
+      "page_index": 4,
+      "pdf_page": 5,
+      "printed_page": 11,
+      "bbox_points": {
+        "x0": 235.0,
+        "top": 120.0,
+        "x1": 440.0,
+        "bottom": 285.0
+      },
+      "crop_path": "milestone1/source-renders/crops/b-body-entry.png",
+      "purpose": "B-section body confirmation of moves 5 through 7."
+    },
+    {
+      "region_id": "b-branch-declaration",
+      "status": "source-verified",
+      "page_index": 5,
+      "pdf_page": 6,
+      "printed_page": 12,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 275.0,
+        "x1": 235.0,
+        "bottom": 390.0
+      },
+      "crop_path": "milestone1/source-renders/crops/b-branch-declaration.png",
+      "purpose": "8.Nc3 branch declaration naming B2 as 8...Bb4."
+    },
+    {
+      "region_id": "b2-heading",
+      "status": "source-verified",
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 350.0,
+        "x1": 235.0,
+        "bottom": 640.0
+      },
+      "crop_path": "milestone1/source-renders/crops/b2-heading-and-first-move.png",
+      "purpose": "B2 heading, first associated diagram, and first move 9.e4."
+    },
+    {
+      "region_id": "b2-right-column",
+      "status": "source-verified",
+      "page_index": 6,
+      "pdf_page": 7,
+      "printed_page": 13,
+      "bbox_points": {
+        "x0": 235.0,
+        "top": 60.0,
+        "x1": 440.0,
+        "bottom": 640.0
+      },
+      "crop_path": "milestone1/source-renders/crops/b2-right-column.png",
+      "purpose": "B2 right-column continuation and second associated diagram."
+    },
+    {
+      "region_id": "b2-page14-left",
+      "status": "source-verified",
+      "page_index": 7,
+      "pdf_page": 8,
+      "printed_page": 14,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 50.0,
+        "x1": 235.0,
+        "bottom": 394.5
+      },
+      "crop_path": "milestone1/source-renders/crops/b2-page14-left.png",
+      "purpose": "B2 continuation and third associated diagram before the C boundary."
+    },
+    {
+      "region_id": "c-boundary",
+      "status": "source-verified",
+      "page_index": 7,
+      "pdf_page": 8,
+      "printed_page": 14,
+      "bbox_points": {
+        "x0": 35.0,
+        "top": 380.0,
+        "x1": 235.0,
+        "bottom": 430.0
+      },
+      "crop_path": "milestone1/source-renders/crops/c-boundary.png",
+      "purpose": "End anchor excluding C) 4...c5 and all following content."
+    }
+  ]
+}
