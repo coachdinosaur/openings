@@ -1,11 +1,13 @@
 "use client";
 
-import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess, Square } from "chess.js";
 import { B2_LESSON } from "./b2-lesson";
 import { CHAPTER1_ANNOTATED_MOVE_IDS, CHAPTER1_LESSON } from "./chapter1-lesson";
 import { canonicalize, EXPECTED_B2_LESSON_HASH, sha256 } from "./canonical";
-import type { DiagramLink, ImportComparison, LessonBlock, MoveReference, ReviewItem, ReviewOverlay, VariationMove, VariationNode } from "./lesson-model";
+import type { DiagramLink, ImportComparison, MoveReference, ReviewItem, ReviewOverlay, VariationMove, VariationNode } from "./lesson-model";
+import { scoreToWhiteFraction, StockfishClient } from "./stockfish-client";
+import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishEvent } from "./stockfish-client";
 
 type View = "lesson" | "review" | "import";
 type ActivePosition = { lineId: string; ply: number };
@@ -132,7 +134,7 @@ function RichText({ text, refs = [], activeMoveId, overlay, onMove }: { text: st
     if (at < 0) return;
     if (at > cursor) output.push(text.slice(cursor, at));
     const move = lineById(reference.lineId).moves[reference.moveIndex];
-    output.push(<button key={`${move.id}-${index}`} className={`inline-move ${activeMoveId === move.id ? "active" : ""}`} onClick={() => onMove(reference.lineId, reference.moveIndex)} title={`Canonical SAN: ${effectiveSan(move, overlay)}`}>{reference.source}</button>);
+    output.push(<button key={`${move.id}-${index}`} className={`inline-move ${reference.unresolved ? "unresolved" : ""} ${activeMoveId === move.id ? "active" : ""}`} onClick={() => onMove(reference.lineId, reference.moveIndex)} title={reference.unresolved ? "Source token preserved; exact board position needs review." : `Canonical SAN: ${effectiveSan(move, overlay)}`}>{reference.source}</button>);
     cursor = at + reference.source.length;
   });
   output.push(text.slice(cursor));
@@ -159,22 +161,146 @@ function DiagramCard({ diagram, overlay, onJump, compact = false }: { diagram: D
   </article>;
 }
 
+function EvaluationRail({ score, flipped }: { score: EngineScore | null; flipped: boolean }) {
+  const whiteFraction = scoreToWhiteFraction(score);
+  const whitePercent = (whiteFraction ?? 0.5) * 100;
+  const blackPercent = 100 - whitePercent;
+  const segments = flipped
+    ? [{ side: "white", height: whitePercent }, { side: "black", height: blackPercent }]
+    : [{ side: "black", height: blackPercent }, { side: "white", height: whitePercent }];
+  const label = score?.label ?? "—";
+  return <div className={`evaluation-rail ${score ? "" : "unknown"}`} role="img" aria-label={score ? `Engine evaluation ${label}, positive favors White` : "Engine evaluation unavailable"} data-orientation={flipped ? "flipped" : "normal"}>
+    {score && <div className="evaluation-segments" aria-hidden="true">{segments.map((segment) => <div key={segment.side} className={`evaluation-segment ${segment.side}`} style={{ height: `${segment.height}%` }} />)}</div>}
+    <span className="evaluation-label" aria-hidden="true">{label}</span>
+  </div>;
+}
+
+const INITIAL_ENGINE_PHASE: EnginePhase = "uninitialized";
+
 function LessonView({ overlay }: { overlay: ReviewOverlay }) {
   const [active, setActive] = useState<ActivePosition>({ lineId: "chapter-start", ply: 7 });
   const [flipped, setFlipped] = useState(false);
   const position = useMemo(() => positionFor(active, overlay), [active, overlay]);
-  const selectMove = (lineId: string, moveIndex: number) => setActive({ lineId, ply: localMovePly(lineId, moveIndex, overlay) });
-  const jumpDiagram = (diagram: DiagramLink) => diagram.lineId === null || diagram.moveIndex === null ? setActive({ lineId: "b2-main", ply: 0 }) : selectMove(diagram.lineId, diagram.moveIndex);
+  const [enginePhase, setEnginePhase] = useState<EnginePhase>(INITIAL_ENGINE_PHASE);
+  const [engineAnalysis, setEngineAnalysis] = useState<AnalysisUpdate | null>(null);
+  const [engineError, setEngineError] = useState<string | null>(null);
+  const [analysisRequested, setAnalysisRequested] = useState(false);
+  const engineClientRef = useRef<StockfishClient | null>(null);
+  const engineUnsubscribeRef = useRef<(() => void) | null>(null);
+  const currentFenRef = useRef(position.fen);
+  const analysisRequestedRef = useRef(false);
+  const expectedSearchIdRef = useRef<number | null>(null);
+  const analysisRequestTokenRef = useRef(0);
+  const enginePhaseRef = useRef<EnginePhase>(INITIAL_ENGINE_PHASE);
+  const mountedRef = useRef(true);
+  const setActivePosition = useCallback((value: ActivePosition | ((current: ActivePosition) => ActivePosition)) => {
+    setEngineAnalysis(null);
+    setActive(value);
+  }, []);
+  const selectMove = (lineId: string, moveIndex: number) => setActivePosition({ lineId, ply: localMovePly(lineId, moveIndex, overlay) });
+  const jumpDiagram = (diagram: DiagramLink) => diagram.lineId === null || diagram.moveIndex === null ? setActivePosition({ lineId: "b2-main", ply: 0 }) : selectMove(diagram.lineId, diagram.moveIndex);
+
+  const setEngineFailure = useCallback((error: unknown) => {
+    if (!mountedRef.current) return;
+    analysisRequestedRef.current = false;
+    expectedSearchIdRef.current = null;
+    analysisRequestTokenRef.current += 1;
+    enginePhaseRef.current = "error";
+    setAnalysisRequested(false);
+    setEnginePhase("error");
+    setEngineAnalysis(null);
+    setEngineError(error instanceof Error ? error.message : "Stockfish could not analyze this position.");
+  }, []);
+
+  const ensureEngineClient = () => {
+    if (engineClientRef.current) return engineClientRef.current;
+    const client = new StockfishClient();
+    const unsubscribe = client.subscribe((event: StockfishEvent) => {
+      if (!mountedRef.current) return;
+      const previousPhase = enginePhaseRef.current;
+      enginePhaseRef.current = event.phase;
+      setEnginePhase(event.phase);
+      if (event.phase === "error") {
+        analysisRequestedRef.current = false;
+        setAnalysisRequested(false);
+        setEngineAnalysis(null);
+        setEngineError(event.error ?? "Stockfish failed to load.");
+        return;
+      }
+      setEngineError(event.error);
+      const matchesDisplayedSearch = event.analysis
+        && event.analysis.fen === currentFenRef.current
+        && event.analysis.searchId === expectedSearchIdRef.current;
+      setEngineAnalysis(matchesDisplayedSearch ? event.analysis : null);
+      if (previousPhase === "searching" && event.phase === "ready" && analysisRequestedRef.current) {
+        analysisRequestedRef.current = false;
+        setAnalysisRequested(false);
+      }
+    });
+    engineClientRef.current = client;
+    engineUnsubscribeRef.current = unsubscribe;
+    return client;
+  };
+
+  const requestAnalysis = useCallback((client: StockfishClient, fen: string) => {
+    const requestToken = ++analysisRequestTokenRef.current;
+    expectedSearchIdRef.current = null;
+    void client.analyze(fen).then((searchId) => {
+      if (!mountedRef.current || requestToken !== analysisRequestTokenRef.current || currentFenRef.current !== fen || !analysisRequestedRef.current) return;
+      expectedSearchIdRef.current = searchId;
+      const current = client.getSnapshot().analysis;
+      if (current?.searchId === searchId && current.fen === fen) setEngineAnalysis(current);
+    }).catch(setEngineFailure);
+  }, [setEngineFailure]);
+
+  const toggleAnalysis = () => {
+    if (enginePhase === "loading" || enginePhase === "stopping" || enginePhase === "restarting" || enginePhase === "error") return;
+    const client = ensureEngineClient();
+    if (analysisRequestedRef.current || enginePhase === "searching") {
+      analysisRequestedRef.current = false;
+      analysisRequestTokenRef.current += 1;
+      setAnalysisRequested(false);
+      void client.stop().catch(setEngineFailure);
+      return;
+    }
+    analysisRequestedRef.current = true;
+    setAnalysisRequested(true);
+    setEngineAnalysis(null);
+    setEngineError(null);
+    requestAnalysis(client, position.fen);
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      if (event.key === "ArrowRight") setActive((value) => ({ ...value, ply: Math.min(linePath(value.lineId, overlay).length, value.ply + 1) }));
-      if (event.key === "ArrowLeft") setActive((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }));
+      if (event.key === "ArrowRight") setActivePosition((value) => ({ ...value, ply: Math.min(linePath(value.lineId, overlay).length, value.ply + 1) }));
+      if (event.key === "ArrowLeft") setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [overlay]);
+  }, [overlay, setActivePosition]);
+
+  useEffect(() => {
+    currentFenRef.current = position.fen;
+    if (analysisRequestedRef.current && engineClientRef.current) {
+      requestAnalysis(engineClientRef.current, position.fen);
+    } else {
+      expectedSearchIdRef.current = null;
+    }
+  }, [position.fen, requestAnalysis]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      engineUnsubscribeRef.current?.();
+      engineUnsubscribeRef.current = null;
+      engineClientRef.current?.dispose();
+      engineClientRef.current = null;
+      expectedSearchIdRef.current = null;
+      analysisRequestTokenRef.current += 1;
+    };
+  }, []);
 
   const activeIndex = active.ply - 1;
   const start = new Chess(lineStartFen(lineById(active.lineId)));
@@ -182,26 +308,55 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
   const halfMove = (turn === "b" ? 1 : 0) + Math.max(activeIndex, 0);
   const moveNumber = Number(fullmove) + Math.floor(halfMove / 2);
   const moveLabel = position.activeMove ? `${moveNumber}${halfMove % 2 === 0 ? "." : "..."}${effectiveSan(position.activeMove, overlay)}` : (lineById(active.lineId).startLabel ?? "Line start");
-  let lastSpan = "";
+  // A retained result is visible only after the FEN ref catches up with the
+  // rendered position. Navigation therefore blanks the old PV immediately,
+  // while Stop keeps it visible for the unchanged position.
+  const visibleAnalysis = engineAnalysis?.fen === position.fen ? engineAnalysis : null;
+  // Keep the last valid PV visible while Stockfish is stopping or ready. A
+  // new search and FEN navigation clear the retained update above.
+  const showPv = visibleAnalysis !== null;
+  const pvOutput = showPv
+    ? [`Depth ${visibleAnalysis.depth ?? "—"}`, visibleAnalysis.score?.label ?? "—", visibleAnalysis.formattedPv].filter(Boolean).join(" · ")
+    : "";
+  const analysisTransition = enginePhase === "loading" || enginePhase === "stopping" || enginePhase === "restarting" || (analysisRequested && enginePhase === "ready");
+  const analysisButtonLabel = enginePhase === "loading" || (analysisRequested && enginePhase === "ready")
+    ? "Loading engine…"
+    : enginePhase === "stopping"
+      ? "Stopping…"
+      : enginePhase === "restarting"
+        ? "Restarting…"
+        : enginePhase === "searching"
+          ? "Stop"
+          : "Analyze";
   return <main className="view lesson-reader">
     <section className="lesson-heading"><div><p className="eyebrow">Chapter 1 · Complete guided source lesson</p><h1>{CHAPTER1_LESSON.title}</h1><p className="lede">Read the complete chapter in verified two-column order through A, B, C, and the conclusion. Select a highlighted move to synchronize the board.</p></div><span className="status-pill verified">✓ Source text verified</span></section>
     <section className="guided-layout">
       <aside className="sticky-board">
-        <div className="board-frame"><Chessboard fen={position.fen} flipped={flipped} /></div>
+        <div className="analysis-pv" aria-label="Stockfish principal variation"><span className="analysis-pv-output">{pvOutput}</span></div>
+        <div className="board-frame primary-board-frame"><div className="board-analysis-row">
+          <EvaluationRail score={visibleAnalysis?.score ?? null} flipped={flipped} />
+          <div className="primary-board"><Chessboard fen={position.fen} flipped={flipped} /></div>
+        </div></div>
         <div className="board-controls" aria-label="Chessboard controls">
-          <button onClick={() => setActive((value) => ({ ...value, ply: 0 }))} aria-label="Go to line start">|‹</button>
-          <button onClick={() => setActive((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }))} aria-label="Previous move">‹</button>
-          <span>{moveLabel}</span>
-          <button onClick={() => setActive((value) => ({ ...value, ply: Math.min(linePath(value.lineId, overlay).length, value.ply + 1) }))} aria-label="Next move">›</button>
-          <button onClick={() => setActive((value) => ({ ...value, ply: linePath(value.lineId, overlay).length }))} aria-label="Go to line end">›|</button>
-          <button className="flip-button" onClick={() => setFlipped((value) => !value)} aria-label="Flip board">↻ Flip</button>
+          <div className="board-nav-controls">
+            <button onClick={() => setActivePosition((value) => ({ ...value, ply: 0 }))} aria-label="Go to line start">|‹</button>
+            <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }))} aria-label="Previous move">‹</button>
+            <span>{moveLabel}</span>
+            <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.min(linePath(value.lineId, overlay).length, value.ply + 1) }))} aria-label="Next move">›</button>
+            <button onClick={() => setActivePosition((value) => ({ ...value, ply: linePath(value.lineId, overlay).length }))} aria-label="Go to line end">›|</button>
+          </div>
+          <div className="board-action-controls">
+            <button className="analysis-button" onClick={toggleAnalysis} aria-label={enginePhase === "searching" ? "Stop Stockfish analysis" : "Analyze current position with Stockfish"} aria-pressed={analysisRequested} disabled={analysisTransition || enginePhase === "error"}>{analysisButtonLabel}</button>
+            <button className="flip-button" onClick={() => setFlipped((value) => !value)} aria-label="Flip board">↻ Flip</button>
+          </div>
+          {engineError && <p className="analysis-error" role="alert">{engineError}</p>}
         </div>
         <div className="active-line"><span>Active line</span><strong>{lineById(active.lineId).label}</strong>{!position.valid && <small>Manual SAN correction is not legal; showing verified baseline position.</small>}</div>
       </aside>
       <article className="narrative" aria-label="Complete Chapter 1 source text">
-        {CHAPTER1_LESSON.blocks.map((block) => {
-          const region = block.sourceSpanId !== lastSpan ? <SourceRegion spanId={block.sourceSpanId} /> : null;
-          lastSpan = block.sourceSpanId;
+        {CHAPTER1_LESSON.blocks.map((block, index) => {
+          const previousSpan = CHAPTER1_LESSON.blocks[index - 1]?.sourceSpanId;
+          const region = block.sourceSpanId !== previousSpan ? <SourceRegion spanId={block.sourceSpanId} /> : null;
           const item = overlay.items[block.id];
           const text = item?.decision === "accepted" && item.correctedText !== undefined ? item.correctedText : "text" in block ? block.text : "";
           let content: ReactNode;
@@ -230,7 +385,7 @@ function ReviewView({ overlay, setOverlay }: { overlay: ReviewOverlay; setOverla
   return <main className="view editor-view">
     <section className="page-heading"><div><p className="eyebrow">Editor mode · Complete Chapter 1</p><h1>Source review</h1><p className="lede">Review stable lesson entities. Accepted corrections form a separate local overlay and are never written over imported evidence.</p></div><span className="autosave">● Saved locally</span></section>
     {overlay.legacyTextReview && <div className="legacy-notice"><strong>Legacy review preserved</strong><p>The earlier partial transcription was archived and was not applied over the new complete source text.</p></div>}
-    <div className="review-tabs"><button className={tab === "text" ? "active" : ""} onClick={() => setTab("text")}>Text · {textBlocks.length}</button><button className={tab === "moves" ? "active" : ""} onClick={() => setTab("moves")}>Moves · {annotatedMoves.length}</button><button className={tab === "boards" ? "active" : ""} onClick={() => setTab("boards")}>Boards · {B2_LESSON.diagrams.length}</button></div>
+    <div className="review-tabs"><button className={tab === "text" ? "active" : ""} onClick={() => setTab("text")}>Text · {textBlocks.length}</button><button className={tab === "moves" ? "active" : ""} onClick={() => setTab("moves")}>Moves · {annotatedMoves.length}</button><button className={tab === "boards" ? "active" : ""} onClick={() => setTab("boards")}>Boards · {CHAPTER1_LESSON.diagrams.length}</button></div>
     {tab === "text" && <div className="review-list">{textBlocks.map((block) => {
       const item = overlay.items[block.id] ?? { decision: "pending" as const };
       const span = spanById(block.sourceSpanId);
@@ -240,7 +395,7 @@ function ReviewView({ overlay, setOverlay }: { overlay: ReviewOverlay; setOverla
       const item = overlay.items[move.id] ?? { decision: "pending" as const };
       return <article className="review-card compact-card" key={move.id}><div className="review-card-meta"><span>{move.id}</span><strong>{move.sourceToken}</strong><small>Canonical and annotations are separate fields.</small></div><div><div className="move-editor-grid"><label>Canonical SAN<input value={item.correctedSan ?? move.san} onChange={(event) => updateItem(move.id, { correctedSan: event.target.value })} /></label><label>Source token<input value={item.sourceToken ?? move.sourceToken} onChange={(event) => updateItem(move.id, { sourceToken: event.target.value })} /></label><label>Punctuation<input value={item.punctuation ?? move.annotation?.punctuation ?? ""} onChange={(event) => updateItem(move.id, { punctuation: event.target.value })} /></label><label>Novelty<input value={item.novelty ?? move.annotation?.novelty ?? ""} onChange={(event) => updateItem(move.id, { novelty: event.target.value })} /></label><label>Evaluation<input value={item.evaluation ?? move.annotation?.evaluation ?? ""} onChange={(event) => updateItem(move.id, { evaluation: event.target.value })} /></label></div><Decision value={item.decision} onChange={(decision) => updateItem(move.id, { decision })} /></div></article>;
     })}</div>}
-    {tab === "boards" && <div className="review-list">{B2_LESSON.diagrams.map((diagram) => {
+    {tab === "boards" && <div className="review-list">{CHAPTER1_LESSON.diagrams.map((diagram) => {
       const item = overlay.items[diagram.id] ?? { decision: "pending" as const, confidence: "unreviewed" as const };
       const fen = item.correctedFen ?? diagram.fen;
       let valid = true; try { new Chess(fen); } catch { valid = false; }
@@ -288,7 +443,13 @@ export default function CatalanApp() {
   const [overlay, setOverlayState] = useState<ReviewOverlay>(emptyOverlay());
   const [editorMode, setEditorMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  useEffect(() => { setOverlayState(migrateReview()); setEditorMode(localStorage.getItem(EDITOR_KEY) === "true"); }, []);
+  useEffect(() => {
+    const hydrationTask = window.setTimeout(() => {
+      setOverlayState(migrateReview());
+      setEditorMode(localStorage.getItem(EDITOR_KEY) === "true");
+    }, 0);
+    return () => window.clearTimeout(hydrationTask);
+  }, []);
   const setOverlay = (value: ReviewOverlay) => { setOverlayState(value); localStorage.setItem(REVIEW_KEY, JSON.stringify(value)); };
   const toggleEditor = () => { const next = !editorMode; setEditorMode(next); localStorage.setItem(EDITOR_KEY, String(next)); if (!next) setView("lesson"); };
   const navigate = (next: View) => { setView(next); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Immutable third-party engine runtime; integrity is verified by SHA-256.
+    "public/stockfish/**",
   ]),
 ]);
 

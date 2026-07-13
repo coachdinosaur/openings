@@ -40,6 +40,8 @@ export type MoveReference = {
   source: string;
   lineId: string;
   moveIndex: number;
+  /** The token is preserved and clickable, but its exact source position still needs review. */
+  unresolved?: boolean;
 };
 
 type LessonBlockBase = {

@@ -53,9 +53,21 @@ test("server renders the complete Chapter 1 learner view with editor tools hidde
   assert.match(html, /Conclusion/);
   assert.match(html, /This seems like the only move that demands any real accuracy from White/);
   assert.match(html, /White(?:’|&#x2019;)s chances are definitely preferable/);
+  assert.match(html, /Stockfish principal variation/);
+  assert.match(html, /Engine evaluation unavailable/);
+  assert.match(html, /Analyze current position with Stockfish/);
+  assert.match(html, />Analyze</);
   assert.match(html, /Editor mode/);
   assert.doesNotMatch(html, />Source review</);
   assert.doesNotMatch(html, />Re-import</);
+});
+
+test("retains the current-position PV after Stop and clears it on navigation", async () => {
+  const app = await readFile(new URL("app/CatalanApp.tsx", root), "utf8");
+  assert.match(app, /const showPv = visibleAnalysis !== null;/);
+  assert.match(app, /const setActivePosition = useCallback\([\s\S]*?setEngineAnalysis\(null\);\s*setActive\(value\);/);
+  assert.match(app, /setAnalysisRequested\(true\);\s*setEngineAnalysis\(null\);\s*setEngineError\(null\);\s*requestAnalysis/);
+  assert.match(app, /analysisRequestedRef\.current = false;\s*analysisRequestTokenRef\.current \+= 1;\s*setAnalysisRequested\(false\);\s*void client\.stop\(\)/);
 });
 
 test("packages every printed Chapter 1 page 8 through 23 in verified source order", async () => {
@@ -77,6 +89,25 @@ test("packages every printed Chapter 1 page 8 through 23 in verified source orde
     assert.match(source, new RegExp(`${heading}[\\s\\S]{0,220}moveRefs`), `${heading} should link its moves`);
   }
   for (const heading of ["c-heading", "c1-heading", "c2-heading", "c21-heading", "c22-heading"]) assert.match(cSource, new RegExp(`${heading}[\\s\\S]{0,260}moveRefs`));
+});
+
+test("makes Section C a complete board-linked reading stream with all 25 diagrams", async () => {
+  const [interactive, lesson, htmlResponse] = await Promise.all([
+    readFile(new URL("app/chapter1-c-interactive.ts", root), "utf8"),
+    readFile(new URL("app/chapter1-lesson.ts", root), "utf8"),
+    render(),
+  ]);
+  const html = await htmlResponse.text();
+  assert.match(lesson, /C_BLOCKS/);
+  assert.match(lesson, /C_DIAGRAMS/);
+  assert.match(interactive, /const diagramSpecs: DiagramSpec\[\] = \[/);
+  assert.equal((interactive.match(/id: "C-D\d+"/g) ?? []).length, 25);
+  assert.match(interactive, /positionStatus: "deterministically derived"/);
+  assert.match(interactive, /boardIdentityStatus: "unresolved"/);
+  assert.match(interactive, /export const C_UNRESOLVED_TOKENS/);
+  const inlineMoves = html.match(/class="inline-move/g) ?? [];
+  assert.ok(inlineMoves.length >= 500, `expected the complete C text to expose hundreds of move links, found ${inlineMoves.length}`);
+  for (let index = 1; index <= 25; index += 1) assert.match(html, new RegExp(`C-D${String(index).padStart(2, "0")}`));
 });
 
 test("preserves the verified two-column reading order and complete B2 boundary", async () => {
@@ -150,11 +181,42 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   const pieces = ["bB", "bK", "bN", "bP", "bQ", "bR", "wB", "wK", "wN", "wP", "wQ", "wR"];
   await Promise.all(pieces.map((piece) => access(new URL(`public/assets/pieces/mpchess/${piece}.svg`, root))));
   await Promise.all(["B2-D01.png", "B2-D02.png", "B2-D03.png", "b2-heading-and-first-move.png", "b2-right-column.png", "b2-page14-left.png"].map((file) => access(new URL(`public/source/crops/${file}`, root))));
-  const [app, css, launcher] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8")]);
+  await Promise.all(Array.from({ length: 25 }, (_, index) => access(new URL(`public/source/crops/c/C-D${String(index + 1).padStart(2, "0")}.png`, root))));
+  const [app, client, css, launcher, vinextPatch] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), readFile(new URL("app/stockfish-client.ts", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8"), readFile(new URL("scripts/patch-vinext-static.mjs", root), "utf8")]);
   assert.match(css, /\.board\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*1fr\)[^}]*grid-template-rows:\s*repeat\(8,\s*1fr\)/s);
+  assert.match(css, /\.board-analysis-row\s*\{[^}]*display:\s*flex[^}]*align-items:\s*stretch/s);
+  assert.match(css, /\.evaluation-rail\s*\{/);
+  assert.match(css, /\.analysis-pv\s*\{[^}]*height:\s*38px/s);
+  assert.match(app, /aria-pressed=\{analysisRequested\}/);
+  assert.match(app, /event\.analysis\.searchId === expectedSearchIdRef\.current/);
+  assert.match(client, /setoption name MultiPV value 1/);
+  assert.match(client, /go infinite/);
+  assert.match(client, /const ENGINE_FILE = "stockfish\/stockfish-18-lite-single\.js"/);
+  assert.match(vinextPatch, /"\.wasm": "application\/wasm"/);
+  assert.match(vinextPatch, /split\(path\.sep\)\.join\("\/"\)/);
   assert.match(app, /catalan-b2-review-v2/);
   assert.match(app, /catalan-b2-review-v1/);
   assert.match(app, /legacyTextReview/);
   assert.match(app, /catalan-editor-mode-v1/);
-  assert.doesNotMatch(`${app}\n${launcher}`, /chess_pieces|Documents[\\/]dev|coachdinosaur/i);
+  assert.doesNotMatch(`${app}\n${client}\n${launcher}`, /chess_pieces|Documents[\\/]dev|coachdinosaur/i);
+});
+
+test("packages the verified Stockfish runtime unchanged in public and production output", async () => {
+  const expected = [
+    ["stockfish-18-lite-single.js", 20670, "2278005057F381491F1C9BB3E44C9F5920B3A00BEF9759E33CC6582769A1F1FE"],
+    ["stockfish-18-lite-single.wasm", 7295411, "A8FBC05EC6920B56D7485826DCB02C5FFD2826BCBF751CF973046F237A9096F1"],
+    ["Copying.txt", 35821, "0B383D5A63DA644F628D99C33976EA6487ED89AAA59F0B3257992DEAC1171E6B"],
+  ];
+  for (const location of ["public/stockfish", "dist/client/stockfish"]) {
+    for (const [file, bytes, sha256] of expected) {
+      const content = await readFile(new URL(`${location}/${file}`, root));
+      assert.equal(content.byteLength, bytes, `${location}/${file} byte size`);
+      assert.equal(crypto.createHash("sha256").update(content).digest("hex").toUpperCase(), sha256, `${location}/${file} SHA-256`);
+    }
+  }
+  const provenance = await readFile(new URL("public/stockfish/SOURCE.txt", root), "utf8");
+  assert.match(provenance, /v18\.0\.0/);
+  assert.match(provenance, /31a9875/);
+  assert.match(provenance, /cb3d4ee/);
+  assert.doesNotMatch(provenance, /[A-Z]:\\|Users[\\/]|Documents[\\/]dev/i);
 });

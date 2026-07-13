@@ -9,7 +9,8 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "npm run build && node --test tests/prototype.test.mjs",
+    "postinstall": "node scripts/patch-vinext-static.mjs",
+    "test": "npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

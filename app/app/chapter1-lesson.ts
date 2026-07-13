@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { B2_LESSON } from "./b2-lesson";
-import { C_BLOCKS, C_LINES, C_SOURCE_SPANS } from "./chapter1-c-section";
+import { C_ANNOTATED_MOVE_IDS, C_BLOCKS, C_DIAGRAMS, C_LINES, C_SOURCE_SPANS } from "./chapter1-c-interactive";
 import type { LessonBlock, LessonDocument, MoveReference, SourceSpan, VariationMove, VariationNode } from "./lesson-model";
 
 const P8L = "chapter1-p08-left";
@@ -143,6 +143,7 @@ export const CHAPTER1_LESSON: LessonDocument = {
   sourceSpans: [...spans, ...C_SOURCE_SPANS],
   lines: [...prefixLines, ...b2Lines, ...C_LINES],
   blocks: [...prefixBlocks, ...b2Blocks, ...C_BLOCKS],
+  diagrams: [...B2_LESSON.diagrams, ...C_DIAGRAMS],
 };
 
-export const CHAPTER1_ANNOTATED_MOVE_IDS = B2_LESSON.lines.flatMap((item) => item.moves).filter((move) => move.annotation).map((move) => move.id);
+export const CHAPTER1_ANNOTATED_MOVE_IDS = [...B2_LESSON.lines.flatMap((item) => item.moves).filter((move) => move.annotation).map((move) => move.id), ...C_ANNOTATED_MOVE_IDS];

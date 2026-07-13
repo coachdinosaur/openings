@@ -11,10 +11,19 @@ if ($major -lt 22) { throw "Node.js 22 or newer is required. Found $(& $node --v
 
 if (-not (Test-Path -LiteralPath (Join-Path $app "node_modules\vinext\dist\cli.js"))) {
   Write-Host "Installing local app dependencies..." -ForegroundColor Cyan
+  $npmCommand = (Get-Command npm.cmd -ErrorAction Stop).Source
+  $npmCli = Join-Path (Split-Path -Parent $npmCommand) "node_modules\npm\bin\npm-cli.js"
+  if (-not (Test-Path -LiteralPath $npmCli)) { throw "Could not locate npm's command-line script." }
   $nodeBin = Split-Path -Parent $node
   $env:Path = "$nodeBin;$env:Path"
-  & npm.cmd install --prefix $app
-  if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
+  Push-Location $app
+  try {
+    & $node $npmCli install
+    $installExitCode = $LASTEXITCODE
+  } finally {
+    Pop-Location
+  }
+  if ($installExitCode -ne 0) { throw "Dependency installation failed." }
 }
 
 $cli = Join-Path $app "node_modules\vinext\dist\cli.js"
