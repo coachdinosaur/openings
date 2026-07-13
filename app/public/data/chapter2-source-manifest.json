@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "source": {
+    "logical_document_id": "catalan.chapter2",
+    "filename": "Chapter2_Catalan.pdf",
+    "page_count": 10,
+    "printed_pages": [24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+    "sha256": "8191475E0B1E5E3B65B1B39EFDA4DB03C87072A8A199B38254FE18E1DD8098C1"
+  },
+  "rendering": {
+    "renderer": "Poppler pdftoppm",
+    "dpi": 144,
+    "format": "PNG",
+    "page_width_points": 474.96,
+    "page_height_points": 676.08
+  },
+  "reading_order": "p24 full-page index, then each body page left column before right column",
+  "source_spans": 19,
+  "diagrams": 25,
+  "page_assets": [
+    "source/chapter2/pages/printed-24.png", "source/chapter2/pages/printed-25.png", "source/chapter2/pages/printed-26.png", "source/chapter2/pages/printed-27.png", "source/chapter2/pages/printed-28.png",
+    "source/chapter2/pages/printed-29.png", "source/chapter2/pages/printed-30.png", "source/chapter2/pages/printed-31.png", "source/chapter2/pages/printed-32.png", "source/chapter2/pages/printed-33.png"
+  ],
+  "diagram_assets": [
+    "source/chapter2/crops/CH2-D01.png", "source/chapter2/crops/CH2-D02.png", "source/chapter2/crops/CH2-D03.png", "source/chapter2/crops/CH2-D04.png", "source/chapter2/crops/CH2-D05.png",
+    "source/chapter2/crops/CH2-D06.png", "source/chapter2/crops/CH2-D07.png", "source/chapter2/crops/CH2-D08.png", "source/chapter2/crops/CH2-D09.png", "source/chapter2/crops/CH2-D10.png",
+    "source/chapter2/crops/CH2-D11.png", "source/chapter2/crops/CH2-D12.png", "source/chapter2/crops/CH2-D13.png", "source/chapter2/crops/CH2-D14.png", "source/chapter2/crops/CH2-D15.png",
+    "source/chapter2/crops/CH2-D16.png", "source/chapter2/crops/CH2-D17.png", "source/chapter2/crops/CH2-D18.png", "source/chapter2/crops/CH2-D19.png", "source/chapter2/crops/CH2-D20.png",
+    "source/chapter2/crops/CH2-D21.png", "source/chapter2/crops/CH2-D22.png", "source/chapter2/crops/CH2-D23.png", "source/chapter2/crops/CH2-D24.png", "source/chapter2/crops/CH2-D25.png"
+  ]
+}

@@ -1,4 +1,4 @@
-# Catalan Chapter 1 interactive lesson
+# Catalan interactive lessons
 
 Run this from PowerShell:
 
@@ -6,6 +6,6 @@ Run this from PowerShell:
 .\start-local.ps1
 ```
 
-The launcher starts the local-only app and opens `http://localhost:3000`. Chapter 1 is complete from printed page 8 through the conclusion on printed page 23, following left-to-right two-column source order through sections A, B, and C. Click a highlighted move to synchronize the board and open sideline cards to study variations.
+The launcher starts the local-only app and opens `http://localhost:3000`. The app now exposes Chapter 1 (printed pages 8–23) and Chapter 2 (printed pages 24–33) as separate chapter routes. Chapter 2 follows the verified source order—printed page 24's full-page index, then each body page's left column before its right column—and includes all 25 source diagrams.
 
-The learner view hides builder tools. Use the **Editor mode** switch at the bottom of the sidebar to reveal granular Source Review and Re-import screens. Review decisions are saved in this browser's local storage and remain separate from the copied Milestone 1 fixture, so a re-import never silently overwrites them.
+The learner view hides builder tools. Use the **Editor mode** switch at the bottom of the sidebar to reveal chapter-specific Source Review and Re-import screens. Review decisions are saved in this browser's local storage under separate keys, so Chapter 2 review state cannot overwrite Chapter 1 decisions.

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Catalan Atelier · Chapter 1",
-  description: "A source-grounded interactive lesson covering all of Catalan Chapter 1.",
+  title: "Catalan Atelier · Chapters 1–2",
+  description: "Source-grounded Catalan lessons with board, diagrams, review, and PDF import verification.",
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
 };
 

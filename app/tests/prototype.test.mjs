@@ -14,6 +14,13 @@ async function loadLesson() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadChapter2() {
+  const source = await readFile(new URL("app/chapter2-lesson.ts", root), "utf8");
+  let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  output = output.replace(/from ["']chess\.js["']/, `from ${JSON.stringify(import.meta.resolve("chess.js"))}`);
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadBoardAnalysis() {
   const source = await readFile(new URL("app/board-analysis.ts", root), "utf8");
   let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -38,12 +45,97 @@ function linePath(lesson, line) {
   return [...linePrefix(lesson, line), ...line.moves];
 }
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
-  return worker.fetch(new Request("http://localhost/", { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
+  return worker.fetch(new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
+
+test("packages Chapter 2 in verified source order with all 25 diagrams", async () => {
+  const { CHAPTER2_LESSON } = await loadChapter2();
+  assert.equal(CHAPTER2_LESSON.source.filename, "Chapter2_Catalan.pdf");
+  assert.equal(CHAPTER2_LESSON.source.sha256, "8191475E0B1E5E3B65B1B39EFDA4DB03C87072A8A199B38254FE18E1DD8098C1");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER2_LESSON)).digest("hex").toUpperCase(), "E267A82A5A50825E55804E60E09B2E8BE859B6F5C7E0099CA6E8406C398F2FCA");
+  assert.deepEqual(CHAPTER2_LESSON.sourceSpans.slice(0, 5).map((span) => [span.printedPage, span.column, span.order]), [[24, "full", 1], [25, "left", 2], [25, "right", 3], [26, "left", 4], [26, "right", 5]]);
+  assert.equal(CHAPTER2_LESSON.sourceSpans.length, 19);
+  assert.equal(CHAPTER2_LESSON.diagrams.length, 25);
+  assert.ok(CHAPTER2_LESSON.lines.length >= 40, `expected Chapter 1-level variation depth, received ${CHAPTER2_LESSON.lines.length} lines`);
+  assert.ok(CHAPTER2_LESSON.blocks.length >= 100, `expected a complete reading stream, received ${CHAPTER2_LESSON.blocks.length} blocks`);
+  for (const heading of ["A) 8...Be7", "B) 8...Nd5!?", "C) 8...Qd7", "C1) 9...Rb8", "C2) 9...O-O-O", "Conclusion"]) assert.match(CHAPTER2_LESSON.blocks.map((block) => "text" in block ? block.text : "").join("\n"), new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  const spanOrder = new Map(CHAPTER2_LESSON.sourceSpans.map((span) => [span.id, span.order]));
+  const blockOrders = CHAPTER2_LESSON.blocks.map((block) => spanOrder.get(block.sourceSpanId));
+  assert.deepEqual([...new Set(CHAPTER2_LESSON.blocks.map((block) => block.sourceSpanId))], CHAPTER2_LESSON.sourceSpans.map((span) => span.id));
+  assert.ok(blockOrders.every((order, index) => index === 0 || order >= blockOrders[index - 1]), "Chapter 2 blocks must remain in full-page, then left-to-right source order");
+  const textBySpan = new Map(CHAPTER2_LESSON.sourceSpans.map((span) => [span.id, CHAPTER2_LESSON.blocks.filter((block) => block.sourceSpanId === span.id && "text" in block).map((block) => block.text).join(" ")]));
+  const pageAnchors = {
+    "chapter2-p24-full": "Variation Index", "chapter2-p25-left": "quite surprised", "chapter2-p25-right": "mutual chances", "chapter2-p26-left": "long-term advantage", "chapter2-p26-right": "tough choice",
+    "chapter2-p27-left": "suggested for Black", "chapter2-p27-right": "going to suffer", "chapter2-p28-left": "lost both games", "chapter2-p28-right": "Only in this way", "chapter2-p29-left": "main continuation",
+    "chapter2-p29-right": "enough compensation", "chapter2-p30-left": "positional advantage", "chapter2-p30-right": "damaged kingside", "chapter2-p31-left": "pleasant advantage", "chapter2-p31-right": "fashionable continuation",
+    "chapter2-p32-left": "real action begins", "chapter2-p32-right": "light-squared bishop", "chapter2-p33-left": "extra pawn", "chapter2-p33-right": "overall assessment",
+  };
+  for (const [spanId, anchor] of Object.entries(pageAnchors)) assert.match(textBySpan.get(spanId), new RegExp(anchor, "i"), `${spanId} is missing ${anchor}`);
+  for (const block of CHAPTER2_LESSON.blocks) {
+    if (!("moveRefs" in block) || !block.moveRefs) continue;
+    for (const reference of block.moveRefs) {
+      const line = CHAPTER2_LESSON.lines.find((candidate) => candidate.id === reference.lineId);
+      assert.ok(line, `${block.id}: missing line ${reference.lineId}`);
+      assert.ok(line.moves[reference.moveIndex], `${block.id}: invalid move index ${reference.moveIndex}`);
+      assert.ok(block.text.includes(reference.source), `${block.id}: source token ${reference.source} is not present in its text`);
+    }
+  }
+  await Promise.all(Array.from({ length: 10 }, (_, index) => access(new URL(`public/source/chapter2/pages/printed-${String(index + 24).padStart(2, "0")}.png`, root))));
+  await Promise.all(Array.from({ length: 25 }, (_, index) => access(new URL(`public/source/chapter2/crops/CH2-D${String(index + 1).padStart(2, "0")}.png`, root))));
+  const response = await render("/chapters/2");
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /Chapter 2 - Complete/);
+  assert.match(html, /Variation Index/);
+  assert.ok((html.match(/data-block-id=/g) ?? []).length >= 100, "Chapter 2 should render the complete reading stream");
+  assert.ok((html.match(/variation-card/g) ?? []).length >= 30, "Chapter 2 should expose source sidelines like Chapter 1");
+  for (let index = 1; index <= 25; index += 1) assert.match(html, new RegExp(`CH2-D${String(index).padStart(2, "0")}`));
+});
+
+test("validates Chapter 2 variation paths and diagram anchors", async () => {
+  const { CHAPTER2_LESSON } = await loadChapter2();
+  for (const line of CHAPTER2_LESSON.lines) {
+    const board = new Chess(line.startFen ?? CHAPTER2_LESSON.basePosition.fen);
+    for (const move of line.moves) assert.doesNotThrow(() => board.move(move.san), `${line.id}: ${move.san}`);
+  }
+  for (const diagram of CHAPTER2_LESSON.diagrams) {
+    const line = CHAPTER2_LESSON.lines.find((candidate) => candidate.id === diagram.lineId);
+    assert.ok(line, diagram.id);
+    const board = new Chess(line.startFen ?? CHAPTER2_LESSON.basePosition.fen);
+    line.moves.slice(0, diagram.moveIndex + 1).forEach((move) => board.move(move.san));
+    assert.equal(board.fen(), diagram.fen, diagram.id);
+  }
+});
+
+test("re-extracts all 19 ordered Chapter 2 source regions", async () => {
+  const { CHAPTER2_LESSON } = await loadChapter2();
+  const bytes = await readFile(new URL("../Chapter2_Catalan.pdf", root));
+  const pdf = await getDocument({ data: new Uint8Array(bytes) }).promise;
+  const anchors = {
+    "chapter2-p24-full": "Variation Index", "chapter2-p25-left": "I am quite surprised", "chapter2-p25-right": "There is no point for White", "chapter2-p26-left": "White has a long-term advantage",
+    "chapter2-p26-right": "Once again White has a tough choice", "chapter2-p27-left": "move which I suggested", "chapter2-p27-right": "This endgame is quite unpleasant", "chapter2-p28-left": "I still like this move",
+    "chapter2-p28-right": "Only in this way", "chapter2-p29-left": "White has the better prospects", "chapter2-p29-right": "following improvement", "chapter2-p30-left": "logical sequence of moves",
+    "chapter2-p30-right": "White enjoys a pleasant Catalan edge", "chapter2-p31-left": "occurred in two games", "chapter2-p31-right": "Currently the most fashionable continuation", "chapter2-p32-left": "pushing the a-pawn",
+    "chapter2-p32-right": "difficult for Black to defend", "chapter2-p33-left": "attacking ideas", "chapter2-p33-right": "Conclusion",
+  };
+  const extracted = [];
+  for (const span of CHAPTER2_LESSON.sourceSpans) {
+    const page = await pdf.getPage(span.pageIndex + 1);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    const text = content.items.filter((item) => "str" in item && "transform" in item).map((item) => ({ str: item.str, x: item.transform[4], top: viewport.height - item.transform[5] })).filter((item) => item.x >= span.bbox.x0 - 8 && item.x <= span.bbox.x1 + 8 && item.top >= span.bbox.top - 18 && item.top <= span.bbox.bottom + 18).sort((left, right) => Math.abs(left.top - right.top) < 2 ? left.x - right.x : left.top - right.top).map((item) => item.str).join(" ").replace(/\s+/g, " ");
+    const anchor = anchors[span.id];
+    assert.ok(anchor, `${span.id}: missing test anchor`);
+    assert.match(text, new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${span.id}: ${anchor}`);
+    extracted.push(span.id);
+  }
+  assert.deepEqual(extracted, CHAPTER2_LESSON.sourceSpans.map((span) => span.id));
+  pdf.cleanup();
+});
 
 test("server renders the complete Chapter 1 learner view with editor tools hidden", async () => {
   const response = await render();

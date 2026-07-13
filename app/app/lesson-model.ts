@@ -5,7 +5,7 @@ export type SourceSpan = {
   status: Status;
   pageIndex: number;
   printedPage: number;
-  column: "left" | "right";
+  column: "left" | "right" | "full";
   order: number;
   crop: string;
   bbox: { x0: number; top: number; x1: number; bottom: number };
