@@ -78,6 +78,14 @@ async function finishHandshake(worker) {
   await nextTask();
 }
 
+test("resolves the Stockfish worker from the site root on nested chapter routes", async () => {
+  const { resolveWorkerUrl } = await loadClientModule();
+  assert.equal(
+    resolveWorkerUrl("https://example.test/chapters/2"),
+    "https://example.test/stockfish/stockfish-18-lite-single.js",
+  );
+});
+
 function harness(StockfishClient, overrides = {}) {
   const workers = [];
   const client = new StockfishClient({

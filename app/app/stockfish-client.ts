@@ -71,7 +71,7 @@ type HandshakeWaiter = {
 };
 type StopCompletion = { promise: Promise<void>; resolve: () => void };
 
-const ENGINE_FILE = "stockfish/stockfish-18-lite-single.js";
+const ENGINE_FILE = "/stockfish/stockfish-18-lite-single.js";
 const MAX_PV_PLIES = 12;
 
 function errorMessage(error: unknown): string {
@@ -199,10 +199,14 @@ export function formatPvSan(fen: string, sanMoves: readonly string[], maxPlies =
   return output.join(" ");
 }
 
+export function resolveWorkerUrl(baseUrl: string | URL): string {
+  return new URL(ENGINE_FILE, baseUrl).href;
+}
+
 function defaultWorkerUrl(): string {
-  if (typeof document !== "undefined") return new URL(ENGINE_FILE, document.baseURI).href;
-  if (typeof location !== "undefined") return new URL(ENGINE_FILE, location.href).href;
-  return `/${ENGINE_FILE}`;
+  if (typeof document !== "undefined") return resolveWorkerUrl(document.baseURI);
+  if (typeof location !== "undefined") return resolveWorkerUrl(location.href);
+  return ENGINE_FILE;
 }
 
 function defaultWorkerFactory(url: string): StockfishWorkerLike {

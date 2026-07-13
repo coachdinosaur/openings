@@ -318,7 +318,7 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   assert.match(app, /event\.analysis\.searchId === expectedSearchIdRef\.current/);
   assert.match(client, /setoption name MultiPV value 1/);
   assert.match(client, /go infinite/);
-  assert.match(client, /const ENGINE_FILE = "stockfish\/stockfish-18-lite-single\.js"/);
+  assert.match(client, /const ENGINE_FILE = "\/stockfish\/stockfish-18-lite-single\.js"/);
   assert.match(vinextPatch, /"\.wasm": "application\/wasm"/);
   assert.match(vinextPatch, /split\(path\.sep\)\.join\("\/"\)/);
   assert.match(app, /catalan-b2-review-v2/);
