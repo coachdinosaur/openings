@@ -14,6 +14,13 @@ async function loadLesson() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadBoardAnalysis() {
+  const source = await readFile(new URL("app/board-analysis.ts", root), "utf8");
+  let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  output = output.replace(/from ["']chess\.js["']/, `from ${JSON.stringify(import.meta.resolve("chess.js"))}`);
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 function canonicalize(value) {
   const excluded = new Set(["timestamp", "generatedId", "absolutePath", "importRunId", "machineName", "userName", "temporaryPath"]);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
@@ -65,9 +72,33 @@ test("server renders the complete Chapter 1 learner view with editor tools hidde
 test("retains the current-position PV after Stop and clears it on navigation", async () => {
   const app = await readFile(new URL("app/CatalanApp.tsx", root), "utf8");
   assert.match(app, /const showPv = visibleAnalysis !== null;/);
-  assert.match(app, /const setActivePosition = useCallback\([\s\S]*?setEngineAnalysis\(null\);\s*setActive\(value\);/);
+  assert.match(app, /const setActivePosition = useCallback\([\s\S]*?setEngineAnalysis\(null\);\s*setAnalysisMoves\(\[\]\);\s*setActive\(value\);/);
   assert.match(app, /setAnalysisRequested\(true\);\s*setEngineAnalysis\(null\);\s*setEngineError\(null\);\s*requestAnalysis/);
   assert.match(app, /analysisRequestedRef\.current = false;\s*analysisRequestTokenRef\.current \+= 1;\s*setAnalysisRequested\(false\);\s*void client\.stop\(\)/);
+});
+
+test("supports legal interactive analysis moves, special moves, and promotion", async () => {
+  const { legalTargets, playAnalysisMove } = await loadBoardAnalysis();
+  const startFen = new Chess().fen();
+  const pawnTargets = legalTargets(startFen, "e2");
+  assert.deepEqual(pawnTargets.map((target) => target.to).sort(), ["e3", "e4"]);
+  assert.equal(playAnalysisMove(startFen, { from: "e2", to: "e5" }), null);
+  const e4 = playAnalysisMove(startFen, { from: "e2", to: "e4" });
+  assert.equal(e4.san, "e4");
+  assert.equal(e4.label, "1.e4");
+  assert.equal(new Chess(e4.fen).turn(), "b");
+
+  const castleFen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+  assert.ok(legalTargets(castleFen, "e1").some((target) => target.to === "g1"));
+  assert.equal(playAnalysisMove(castleFen, { from: "e1", to: "g1" }).san, "O-O");
+
+  const enPassantFen = "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1";
+  assert.ok(legalTargets(enPassantFen, "e5").some((target) => target.to === "d6" && target.capture));
+
+  const promotionFen = "8/P7/8/8/8/8/7p/4K2k w - - 0 1";
+  assert.equal(legalTargets(promotionFen, "a7").filter((target) => target.to === "a8").length, 4);
+  const promoted = playAnalysisMove(promotionFen, { from: "a7", to: "a8", promotion: "n" });
+  assert.equal(new Chess(promoted.fen).get("a8").type, "n");
 });
 
 test("packages every printed Chapter 1 page 8 through 23 in verified source order", async () => {
@@ -187,7 +218,11 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   assert.match(css, /\.board-analysis-row\s*\{[^}]*display:\s*flex[^}]*align-items:\s*stretch/s);
   assert.match(css, /\.evaluation-rail\s*\{/);
   assert.match(css, /\.analysis-pv\s*\{[^}]*height:\s*38px/s);
+  assert.match(css, /\.square\.selected\s*\{/);
+  assert.match(css, /\.analysis-branch-controls\s*\{/);
   assert.match(app, /aria-pressed=\{analysisRequested\}/);
+  assert.match(app, /onMove=\{applyAnalysisMove\}/);
+  assert.match(app, /setAnalysisMoves\(\(current\) => current\.slice\(0, -1\)\)/);
   assert.match(app, /event\.analysis\.searchId === expectedSearchIdRef\.current/);
   assert.match(client, /setoption name MultiPV value 1/);
   assert.match(client, /go infinite/);

@@ -6,6 +6,8 @@ import { B2_LESSON } from "./b2-lesson";
 import { CHAPTER1_ANNOTATED_MOVE_IDS, CHAPTER1_LESSON } from "./chapter1-lesson";
 import { canonicalize, EXPECTED_B2_LESSON_HASH, sha256 } from "./canonical";
 import type { DiagramLink, ImportComparison, MoveReference, ReviewItem, ReviewOverlay, VariationMove, VariationNode } from "./lesson-model";
+import { legalTargets, playAnalysisMove } from "./board-analysis";
+import type { AnalysisMove, BoardMoveInput, PromotionPiece } from "./board-analysis";
 import { scoreToWhiteFraction, StockfishClient } from "./stockfish-client";
 import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishEvent } from "./stockfish-client";
 
@@ -102,21 +104,107 @@ function migrateReview(): ReviewOverlay {
   return next;
 }
 
-function Chessboard({ fen, flipped = false }: { fen: string; flipped?: boolean }) {
+function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; flipped?: boolean; onMove?: (move: BoardMoveInput) => void; lastMove?: BoardMoveInput | null }) {
   const chess = useMemo(() => new Chess(fen), [fen]);
+  const interactive = Boolean(onMove);
+  const [selected, setSelected] = useState<Square | null>(null);
+  const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
+  const targets = useMemo(() => selected ? legalTargets(fen, selected) : [], [fen, selected]);
+  const dragSourceRef = useRef<Square | null>(null);
   const files = flipped ? ["h", "g", "f", "e", "d", "c", "b", "a"] : ["a", "b", "c", "d", "e", "f", "g", "h"];
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
-  return <div className="board" role="img" aria-label={`Chess position: ${fen}`}>
+  useEffect(() => {
+    setSelected(null);
+    setPromotion(null);
+  }, [fen, flipped]);
+
+  const targetFor = (square: Square) => targets.filter((target) => target.to === square);
+  const selectSquare = (square: Square) => {
+    if (!interactive || !onMove) return;
+    const piece = chess.get(square);
+    const options = targetFor(square);
+    if (selected) {
+      if (square === selected) {
+        setSelected(null);
+        return;
+      }
+      if (options.length) {
+        if (options.some((target) => target.promotion)) setPromotion({ from: selected, to: square });
+        else onMove({ from: selected, to: square });
+        setSelected(null);
+        return;
+      }
+      setSelected(piece?.color === chess.turn() ? square : null);
+      return;
+    }
+    if (piece?.color === chess.turn()) setSelected(square);
+  };
+  const dropMove = (from: Square, to: Square) => {
+    if (!interactive || !onMove) return;
+    const fromTargets = legalTargets(fen, from);
+    const options = fromTargets.filter((target) => target.to === to);
+    if (!options.length) {
+      setSelected(null);
+      return;
+    }
+    if (options.some((target) => target.promotion)) setPromotion({ from, to });
+    else onMove({ from, to });
+    setSelected(null);
+  };
+  const choosePromotion = (piece: PromotionPiece) => {
+    if (promotion && onMove) onMove({ from: promotion.from, to: promotion.to, promotion: piece });
+    setPromotion(null);
+    setSelected(null);
+  };
+  const boardLabel = interactive ? `Interactive chess position: ${fen}` : `Chess position: ${fen}`;
+  return <div className={`board ${interactive ? "interactive" : ""}`} role={interactive ? "grid" : "img"} aria-label={boardLabel}>
     {ranks.flatMap((rank) => files.map((file) => {
       const square = `${file}${rank}` as Square;
       const piece = chess.get(square);
       const light = (file.charCodeAt(0) - 97 + rank) % 2 === 0;
-      return <div className={`square ${light ? "light" : "dark"}`} key={square}>
+      const options = targetFor(square);
+      const isSelected = selected === square;
+      const isLastMove = lastMove?.from === square || lastMove?.to === square;
+      const classes = `square ${light ? "light" : "dark"} ${interactive ? "interactive" : ""} ${isSelected ? "selected" : ""} ${options.length ? "legal-target" : ""} ${options.some((target) => target.capture) ? "capture-target" : ""} ${isLastMove ? "last-move" : ""}`;
+      const content = <>
         {piece && <img draggable={false} src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`} alt={`${piece.color === "w" ? "White" : "Black"} ${piece.type}`} />}
         {file === files[0] && <span className="rank-label">{rank}</span>}
         {rank === ranks[ranks.length - 1] && <span className="file-label">{file}</span>}
-      </div>;
+      </>;
+      const description = `${square}, ${piece ? `${piece.color === "w" ? "white" : "black"} ${piece.type}` : "empty"}${isSelected ? ", selected" : ""}${options.length ? ", legal destination" : ""}`;
+      if (!interactive) return <div className={classes} key={square}>{content}</div>;
+      return <button
+        type="button"
+        className={classes}
+        key={square}
+        aria-label={description}
+        draggable={Boolean(piece)}
+        onClick={() => selectSquare(square)}
+        onDragStart={(event) => {
+          if (!piece || piece.color !== chess.turn()) { event.preventDefault(); return; }
+          dragSourceRef.current = square;
+          setSelected(square);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", square);
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          const source = dragSourceRef.current ?? event.dataTransfer.getData("text/plain") as Square;
+          if (source && source !== square) {
+            setSelected(source);
+            dropMove(source, square);
+          }
+          dragSourceRef.current = null;
+        }}
+        onDragEnd={() => { dragSourceRef.current = null; }}
+      >{content}</button>;
     }))}
+    {promotion && <div className="promotion-picker" role="dialog" aria-modal="true" aria-label="Choose promotion piece">
+      <strong>Promote pawn</strong>
+      <div>{(["q", "r", "b", "n"] as const).map((piece) => <button type="button" key={piece} onClick={() => choosePromotion(piece)} aria-label={`Promote to ${piece === "q" ? "queen" : piece === "r" ? "rook" : piece === "b" ? "bishop" : "knight"}`}><img src={`/assets/pieces/mpchess/${chess.get(promotion.from)?.color ?? "w"}${piece.toUpperCase()}.svg`} alt="" /></button>)}</div>
+      <button type="button" className="promotion-cancel" onClick={() => setPromotion(null)}>Cancel</button>
+    </div>}
   </div>;
 }
 
@@ -181,13 +269,16 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
   const [active, setActive] = useState<ActivePosition>({ lineId: "chapter-start", ply: 7 });
   const [flipped, setFlipped] = useState(false);
   const position = useMemo(() => positionFor(active, overlay), [active, overlay]);
+  const [analysisMoves, setAnalysisMoves] = useState<AnalysisMove[]>([]);
+  const displayedFen = analysisMoves.length ? analysisMoves[analysisMoves.length - 1].fen : position.fen;
+  const lastAnalysisMove = analysisMoves.length ? analysisMoves[analysisMoves.length - 1] : null;
   const [enginePhase, setEnginePhase] = useState<EnginePhase>(INITIAL_ENGINE_PHASE);
   const [engineAnalysis, setEngineAnalysis] = useState<AnalysisUpdate | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [analysisRequested, setAnalysisRequested] = useState(false);
   const engineClientRef = useRef<StockfishClient | null>(null);
   const engineUnsubscribeRef = useRef<(() => void) | null>(null);
-  const currentFenRef = useRef(position.fen);
+  const currentFenRef = useRef(displayedFen);
   const analysisRequestedRef = useRef(false);
   const expectedSearchIdRef = useRef<number | null>(null);
   const analysisRequestTokenRef = useRef(0);
@@ -195,8 +286,24 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
   const mountedRef = useRef(true);
   const setActivePosition = useCallback((value: ActivePosition | ((current: ActivePosition) => ActivePosition)) => {
     setEngineAnalysis(null);
+    setAnalysisMoves([]);
     setActive(value);
   }, []);
+  const applyAnalysisMove = useCallback((input: BoardMoveInput) => {
+    const move = playAnalysisMove(displayedFen, input);
+    if (!move) return;
+    setEngineAnalysis(null);
+    setEngineError(null);
+    setAnalysisMoves((current) => [...current, move]);
+  }, [displayedFen]);
+  const undoAnalysisMove = () => {
+    setEngineAnalysis(null);
+    setAnalysisMoves((current) => current.slice(0, -1));
+  };
+  const resetAnalysis = () => {
+    setEngineAnalysis(null);
+    setAnalysisMoves([]);
+  };
   const selectMove = (lineId: string, moveIndex: number) => setActivePosition({ lineId, ply: localMovePly(lineId, moveIndex, overlay) });
   const jumpDiagram = (diagram: DiagramLink) => diagram.lineId === null || diagram.moveIndex === null ? setActivePosition({ lineId: "b2-main", ply: 0 }) : selectMove(diagram.lineId, diagram.moveIndex);
 
@@ -267,7 +374,7 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
     setAnalysisRequested(true);
     setEngineAnalysis(null);
     setEngineError(null);
-    requestAnalysis(client, position.fen);
+    requestAnalysis(client, displayedFen);
   };
 
   useEffect(() => {
@@ -281,13 +388,13 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
   }, [overlay, setActivePosition]);
 
   useEffect(() => {
-    currentFenRef.current = position.fen;
+    currentFenRef.current = displayedFen;
     if (analysisRequestedRef.current && engineClientRef.current) {
-      requestAnalysis(engineClientRef.current, position.fen);
+      requestAnalysis(engineClientRef.current, displayedFen);
     } else {
       expectedSearchIdRef.current = null;
     }
-  }, [position.fen, requestAnalysis]);
+  }, [displayedFen, requestAnalysis]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -307,11 +414,11 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
   const [, turn, , , , fullmove] = start.fen().split(" ");
   const halfMove = (turn === "b" ? 1 : 0) + Math.max(activeIndex, 0);
   const moveNumber = Number(fullmove) + Math.floor(halfMove / 2);
-  const moveLabel = position.activeMove ? `${moveNumber}${halfMove % 2 === 0 ? "." : "..."}${effectiveSan(position.activeMove, overlay)}` : (lineById(active.lineId).startLabel ?? "Line start");
+  const moveLabel = lastAnalysisMove?.label ?? (position.activeMove ? `${moveNumber}${halfMove % 2 === 0 ? "." : "..."}${effectiveSan(position.activeMove, overlay)}` : (lineById(active.lineId).startLabel ?? "Line start"));
   // A retained result is visible only after the FEN ref catches up with the
   // rendered position. Navigation therefore blanks the old PV immediately,
   // while Stop keeps it visible for the unchanged position.
-  const visibleAnalysis = engineAnalysis?.fen === position.fen ? engineAnalysis : null;
+  const visibleAnalysis = engineAnalysis?.fen === displayedFen ? engineAnalysis : null;
   // Keep the last valid PV visible while Stockfish is stopping or ready. A
   // new search and FEN navigation clear the retained update above.
   const showPv = visibleAnalysis !== null;
@@ -335,7 +442,7 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
         <div className="analysis-pv" aria-label="Stockfish principal variation"><span className="analysis-pv-output">{pvOutput}</span></div>
         <div className="board-frame primary-board-frame"><div className="board-analysis-row">
           <EvaluationRail score={visibleAnalysis?.score ?? null} flipped={flipped} />
-          <div className="primary-board"><Chessboard fen={position.fen} flipped={flipped} /></div>
+          <div className="primary-board"><Chessboard fen={displayedFen} flipped={flipped} onMove={applyAnalysisMove} lastMove={lastAnalysisMove} /></div>
         </div></div>
         <div className="board-controls" aria-label="Chessboard controls">
           <div className="board-nav-controls">
@@ -345,13 +452,18 @@ function LessonView({ overlay }: { overlay: ReviewOverlay }) {
             <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.min(linePath(value.lineId, overlay).length, value.ply + 1) }))} aria-label="Next move">›</button>
             <button onClick={() => setActivePosition((value) => ({ ...value, ply: linePath(value.lineId, overlay).length }))} aria-label="Go to line end">›|</button>
           </div>
+          {analysisMoves.length > 0 && <div className="analysis-branch-controls" aria-label="Analysis branch controls">
+            <span>Analysis branch · {analysisMoves.length} {analysisMoves.length === 1 ? "ply" : "plies"}</span>
+            <div><button onClick={undoAnalysisMove} aria-label="Undo analysis move">Undo</button><button onClick={resetAnalysis} aria-label="Reset analysis to lesson position">Reset</button></div>
+          </div>}
           <div className="board-action-controls">
             <button className="analysis-button" onClick={toggleAnalysis} aria-label={enginePhase === "searching" ? "Stop Stockfish analysis" : "Analyze current position with Stockfish"} aria-pressed={analysisRequested} disabled={analysisTransition || enginePhase === "error"}>{analysisButtonLabel}</button>
             <button className="flip-button" onClick={() => setFlipped((value) => !value)} aria-label="Flip board">↻ Flip</button>
           </div>
           {engineError && <p className="analysis-error" role="alert">{engineError}</p>}
+          <p className="keyboard-hint">Select a piece, then choose a highlighted square · drag to move</p>
         </div>
-        <div className="active-line"><span>Active line</span><strong>{lineById(active.lineId).label}</strong>{!position.valid && <small>Manual SAN correction is not legal; showing verified baseline position.</small>}</div>
+        <div className="active-line"><span>{analysisMoves.length ? "Analysis from" : "Active line"}</span><strong>{lineById(active.lineId).label}</strong>{analysisMoves.length > 0 && <small>{analysisMoves.length} exploratory {analysisMoves.length === 1 ? "move" : "moves"}; lesson source remains unchanged.</small>}{!position.valid && <small>Manual SAN correction is not legal; showing verified baseline position.</small>}</div>
       </aside>
       <article className="narrative" aria-label="Complete Chapter 1 source text">
         {CHAPTER1_LESSON.blocks.map((block, index) => {
