@@ -1,44 +1,78 @@
 "use client";
 
-import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, memo, ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess, Square } from "chess.js";
 import { B2_LESSON } from "./b2-lesson";
-import { CHAPTER1_ANNOTATED_MOVE_IDS, CHAPTER1_LESSON } from "./chapter1-lesson";
 import { chapterConfig, type ChapterConfig } from "./chapter-config";
-import { canonicalize, EXPECTED_B2_LESSON_HASH, sha256 } from "./canonical";
+import { canonicalize, sha256 } from "./canonical";
 import type { DiagramLink, ImportComparison, LessonDocument, MoveReference, ReviewItem, ReviewOverlay, VariationMove, VariationNode } from "./lesson-model";
 import { legalTargets, playAnalysisMove } from "./board-analysis";
 import type { AnalysisMove, BoardMoveInput, PromotionPiece } from "./board-analysis";
-import { scoreToWhiteFraction, StockfishClient } from "./stockfish-client";
-import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishEvent } from "./stockfish-client";
+import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishClient, StockfishEvent } from "./stockfish-client";
 
 type View = "lesson" | "review" | "import";
 type ActivePosition = { lineId: string; ply: number };
 type ReviewTab = "text" | "moves" | "boards";
 
-const REVIEW_KEY = "catalan-b2-review-v2";
 const LEGACY_REVIEW_KEY = "catalan-b2-review-v1";
 const EDITOR_KEY = "catalan-editor-mode-v1";
 
+const lessonLineIndexes = new WeakMap<LessonDocument, Map<string, VariationNode>>();
+const lessonSpanIndexes = new WeakMap<LessonDocument, Map<string, LessonDocument["sourceSpans"][number]>>();
+const lessonDiagramIndexes = new WeakMap<LessonDocument, Map<string, DiagramLink>>();
+const lessonPathCaches = new WeakMap<LessonDocument, Map<string, VariationMove[]>>();
+type ResolvedPosition = { fen: string; path: VariationMove[]; valid: boolean; activeMove: VariationMove | undefined };
+const positionCaches = new WeakMap<ReviewOverlay, WeakMap<LessonDocument, Map<string, ResolvedPosition>>>();
+
 const emptyOverlay = (lesson: LessonDocument): ReviewOverlay => ({ schemaVersion: 2, fixtureSha256: lesson.source.sha256, items: {} });
-const lineById = (lesson: LessonDocument, id: string) => lesson.lines.find((line) => line.id === id) ?? lesson.lines[0];
-const spanById = (lesson: LessonDocument, id: string) => lesson.sourceSpans.find((span) => span.id === id) ?? lesson.sourceSpans[0];
-const diagramById = (lesson: LessonDocument, id: string) => lesson.diagrams.find((diagram) => diagram.id === id) ?? lesson.diagrams[0];
+const lineById = (lesson: LessonDocument, id: string) => {
+  let index = lessonLineIndexes.get(lesson);
+  if (!index) {
+    index = new Map(lesson.lines.map((line) => [line.id, line]));
+    lessonLineIndexes.set(lesson, index);
+  }
+  return index.get(id) ?? lesson.lines[0];
+};
+const spanById = (lesson: LessonDocument, id: string) => {
+  let index = lessonSpanIndexes.get(lesson);
+  if (!index) {
+    index = new Map(lesson.sourceSpans.map((span) => [span.id, span]));
+    lessonSpanIndexes.set(lesson, index);
+  }
+  return index.get(id) ?? lesson.sourceSpans[0];
+};
+const diagramById = (lesson: LessonDocument, id: string) => {
+  let index = lessonDiagramIndexes.get(lesson);
+  if (!index) {
+    index = new Map(lesson.diagrams.map((diagram) => [diagram.id, diagram]));
+    lessonDiagramIndexes.set(lesson, index);
+  }
+  return index.get(id) ?? lesson.diagrams[0];
+};
 
 function effectiveSan(move: VariationMove, overlay: ReviewOverlay): string {
   const item = overlay.items[move.id];
   return item?.decision === "accepted" && item.correctedSan?.trim() ? item.correctedSan.trim() : move.san;
 }
 
-function linePrefix(lesson: LessonDocument, line: VariationNode, overlay: ReviewOverlay): VariationMove[] {
+function linePrefix(lesson: LessonDocument, line: VariationNode): VariationMove[] {
   if (!line.parentLineId) return [];
   const parent = lineById(lesson, line.parentLineId);
-  return [...linePrefix(lesson, parent, overlay), ...parent.moves.slice(0, line.parentPly)];
+  return [...linePrefix(lesson, parent), ...parent.moves.slice(0, line.parentPly)];
 }
 
-function linePath(lesson: LessonDocument, lineId: string, overlay: ReviewOverlay): VariationMove[] {
+function linePath(lesson: LessonDocument, lineId: string): VariationMove[] {
+  let cache = lessonPathCaches.get(lesson);
+  if (!cache) {
+    cache = new Map();
+    lessonPathCaches.set(lesson, cache);
+  }
+  const cached = cache.get(lineId);
+  if (cached) return cached;
   const line = lineById(lesson, lineId);
-  return [...linePrefix(lesson, line, overlay), ...line.moves];
+  const path = [...linePrefix(lesson, line), ...line.moves];
+  cache.set(lineId, path);
+  return path;
 }
 
 function lineStartFen(lesson: LessonDocument, line: VariationNode): string {
@@ -47,12 +81,25 @@ function lineStartFen(lesson: LessonDocument, line: VariationNode): string {
   return lesson.basePosition.fen;
 }
 
-function localMovePly(lesson: LessonDocument, lineId: string, moveIndex: number, overlay: ReviewOverlay): number {
-  return linePrefix(lesson, lineById(lesson, lineId), overlay).length + moveIndex + 1;
+function localMovePly(lesson: LessonDocument, lineId: string, moveIndex: number): number {
+  return linePrefix(lesson, lineById(lesson, lineId)).length + moveIndex + 1;
 }
 
-function positionFor(lesson: LessonDocument, active: ActivePosition, overlay: ReviewOverlay) {
-  const path = linePath(lesson, active.lineId, overlay);
+function positionFor(lesson: LessonDocument, active: ActivePosition, overlay: ReviewOverlay): ResolvedPosition {
+  let lessonCaches = positionCaches.get(overlay);
+  if (!lessonCaches) {
+    lessonCaches = new WeakMap();
+    positionCaches.set(overlay, lessonCaches);
+  }
+  let cache = lessonCaches.get(lesson);
+  if (!cache) {
+    cache = new Map();
+    lessonCaches.set(lesson, cache);
+  }
+  const cacheKey = `${active.lineId}:${active.ply}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  const path = linePath(lesson, active.lineId);
   const startFen = lineStartFen(lesson, lineById(lesson, active.lineId));
   const chess = new Chess(startFen);
   let valid = true;
@@ -62,9 +109,19 @@ function positionFor(lesson: LessonDocument, active: ActivePosition, overlay: Re
     valid = false;
     const fallback = new Chess(startFen);
     path.slice(0, active.ply).forEach((move) => fallback.move(move.san));
-    return { fen: fallback.fen(), path, valid, activeMove: path[active.ply - 1] };
+    const resolved = { fen: fallback.fen(), path, valid, activeMove: path[active.ply - 1] };
+    cache.set(cacheKey, resolved);
+    return resolved;
   }
-  return { fen: chess.fen(), path, valid, activeMove: path[active.ply - 1] };
+  const resolved = { fen: chess.fen(), path, valid, activeMove: path[active.ply - 1] };
+  cache.set(cacheKey, resolved);
+  return resolved;
+}
+
+function scoreToWhiteFraction(score: EngineScore | null): number | null {
+  if (!score) return null;
+  if (score.kind === "mate") return score.whiteValue > 0 ? 0.98 : score.whiteValue < 0 ? 0.02 : 0.5;
+  return Math.min(0.94, Math.max(0.06, 0.5 + score.whiteValue / 1200));
 }
 
 function migrateReview(config: ChapterConfig): ReviewOverlay {
@@ -106,19 +163,19 @@ function migrateReview(config: ChapterConfig): ReviewOverlay {
   return next;
 }
 
-function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; flipped?: boolean; onMove?: (move: BoardMoveInput) => void; lastMove?: BoardMoveInput | null }) {
+const Chessboard = memo(function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; flipped?: boolean; onMove?: (move: BoardMoveInput) => void; lastMove?: BoardMoveInput | null }) {
   const chess = useMemo(() => new Chess(fen), [fen]);
   const interactive = Boolean(onMove);
-  const [selected, setSelected] = useState<Square | null>(null);
-  const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
+  const boardKey = `${fen}:${flipped ? "flipped" : "normal"}`;
+  const [selectionState, setSelectionState] = useState<{ boardKey: string; square: Square | null }>({ boardKey, square: null });
+  const [promotionState, setPromotionState] = useState<{ boardKey: string; move: { from: Square; to: Square } | null }>({ boardKey, move: null });
+  const selected = selectionState.boardKey === boardKey ? selectionState.square : null;
+  const promotion = promotionState.boardKey === boardKey ? promotionState.move : null;
+  const setSelected = (square: Square | null) => setSelectionState({ boardKey, square });
+  const setPromotion = (move: { from: Square; to: Square } | null) => setPromotionState({ boardKey, move });
   const targets = useMemo(() => selected ? legalTargets(fen, selected) : [], [fen, selected]);
-  const dragSourceRef = useRef<Square | null>(null);
   const files = flipped ? ["h", "g", "f", "e", "d", "c", "b", "a"] : ["a", "b", "c", "d", "e", "f", "g", "h"];
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
-  useEffect(() => {
-    setSelected(null);
-    setPromotion(null);
-  }, [fen, flipped]);
 
   const targetFor = (square: Square) => targets.filter((target) => target.to === square);
   const selectSquare = (square: Square) => {
@@ -169,7 +226,7 @@ function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; f
       const isLastMove = lastMove?.from === square || lastMove?.to === square;
       const classes = `square ${light ? "light" : "dark"} ${interactive ? "interactive" : ""} ${isSelected ? "selected" : ""} ${options.length ? "legal-target" : ""} ${options.some((target) => target.capture) ? "capture-target" : ""} ${isLastMove ? "last-move" : ""}`;
       const content = <>
-        {piece && <img draggable={false} src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`} alt={`${piece.color === "w" ? "White" : "Black"} ${piece.type}`} />}
+        {piece && <img draggable={false} decoding="async" src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`} alt={`${piece.color === "w" ? "White" : "Black"} ${piece.type}`} />}
         {file === files[0] && <span className="rank-label">{rank}</span>}
         {rank === ranks[ranks.length - 1] && <span className="file-label">{file}</span>}
       </>;
@@ -184,7 +241,6 @@ function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; f
         onClick={() => selectSquare(square)}
         onDragStart={(event) => {
           if (!piece || piece.color !== chess.turn()) { event.preventDefault(); return; }
-          dragSourceRef.current = square;
           setSelected(square);
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", square);
@@ -192,23 +248,21 @@ function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; f
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
-          const source = dragSourceRef.current ?? event.dataTransfer.getData("text/plain") as Square;
+          const source = event.dataTransfer.getData("text/plain") as Square;
           if (source && source !== square) {
             setSelected(source);
             dropMove(source, square);
           }
-          dragSourceRef.current = null;
         }}
-        onDragEnd={() => { dragSourceRef.current = null; }}
       >{content}</button>;
     }))}
     {promotion && <div className="promotion-picker" role="dialog" aria-modal="true" aria-label="Choose promotion piece">
       <strong>Promote pawn</strong>
-      <div>{(["q", "r", "b", "n"] as const).map((piece) => <button type="button" key={piece} onClick={() => choosePromotion(piece)} aria-label={`Promote to ${piece === "q" ? "queen" : piece === "r" ? "rook" : piece === "b" ? "bishop" : "knight"}`}><img src={`/assets/pieces/mpchess/${chess.get(promotion.from)?.color ?? "w"}${piece.toUpperCase()}.svg`} alt="" /></button>)}</div>
+      <div>{(["q", "r", "b", "n"] as const).map((piece) => <button type="button" key={piece} onClick={() => choosePromotion(piece)} aria-label={`Promote to ${piece === "q" ? "queen" : piece === "r" ? "rook" : piece === "b" ? "bishop" : "knight"}`}><img decoding="async" src={`/assets/pieces/mpchess/${chess.get(promotion.from)?.color ?? "w"}${piece.toUpperCase()}.svg`} alt="" /></button>)}</div>
       <button type="button" className="promotion-cancel" onClick={() => setPromotion(null)}>Cancel</button>
     </div>}
   </div>;
-}
+});
 
 function Decision({ value, onChange }: { value: ReviewItem["decision"]; onChange: (value: ReviewItem["decision"]) => void }) {
   return <div className="decision" role="group" aria-label="Review decision">
@@ -216,7 +270,7 @@ function Decision({ value, onChange }: { value: ReviewItem["decision"]; onChange
   </div>;
 }
 
-function RichText({ lesson, text, refs = [], activeMoveId, overlay, onMove }: { lesson: LessonDocument; text: string; refs?: MoveReference[]; activeMoveId?: string; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void }) {
+function RichText({ lesson, text, refs = [], overlay, onMove }: { lesson: LessonDocument; text: string; refs?: MoveReference[]; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void }) {
   const output: ReactNode[] = [];
   let cursor = 0;
   refs.forEach((reference, index) => {
@@ -224,7 +278,7 @@ function RichText({ lesson, text, refs = [], activeMoveId, overlay, onMove }: { 
     if (at < 0) return;
     if (at > cursor) output.push(text.slice(cursor, at));
     const move = lineById(lesson, reference.lineId).moves[reference.moveIndex];
-    output.push(<button key={`${move.id}-${index}`} className={`inline-move ${reference.unresolved ? "unresolved" : ""} ${activeMoveId === move.id ? "active" : ""}`} onClick={() => onMove(reference.lineId, reference.moveIndex)} title={reference.unresolved ? "Source token preserved; exact board position needs review." : `Canonical SAN: ${effectiveSan(move, overlay)}`}>{reference.source}</button>);
+    output.push(<button key={`${move.id}-${index}`} data-move-id={move.id} className={`inline-move ${reference.unresolved ? "unresolved" : ""}`} onClick={() => onMove(reference.lineId, reference.moveIndex)} title={reference.unresolved ? "Source token preserved; exact board position needs review." : `Canonical SAN: ${effectiveSan(move, overlay)}`}>{reference.source}</button>);
     cursor = at + reference.source.length;
   });
   output.push(text.slice(cursor));
@@ -236,7 +290,7 @@ function SourceRegion({ lesson, spanId }: { lesson: LessonDocument; spanId: stri
   return <div className="source-region">
     <span>Source order {span.order}</span>
     <strong>Printed page {span.printedPage} · {span.column} column</strong>
-    <details><summary>View source evidence</summary><img src={span.crop} alt={`Printed page ${span.printedPage} ${span.column} column crop`} /></details>
+    <details><summary>View source evidence</summary><img loading="lazy" decoding="async" src={span.crop} alt={`Printed page ${span.printedPage} ${span.column} column crop`} /></details>
   </div>;
 }
 
@@ -247,9 +301,32 @@ function DiagramCard({ diagram, overlay, onJump, compact = false }: { diagram: D
     <div className="diagram-heading"><div><span>{diagram.id}</span><h3>{diagram.role}</h3></div><button onClick={onJump}>Jump to position</button></div>
     <div className="diagram-statuses"><span>{diagram.associationStatus} association</span><span>{diagram.positionStatus} position</span><span>{review?.decision === "accepted" ? "manually reviewed" : diagram.boardIdentityStatus + " identity"}</span></div>
     {compact && <div className="diagram-preview-board"><Chessboard fen={fen} /></div>}
-    <details className="printed-diagram"><summary>View printed diagram</summary><img src={diagram.crop} alt={`${diagram.id} printed chess diagram`} /></details>
+    <details className="printed-diagram"><summary>View printed diagram</summary><img loading="lazy" decoding="async" src={diagram.crop} alt={`${diagram.id} printed chess diagram`} /></details>
   </article>;
 }
+
+const Narrative = memo(function Narrative({ lesson, overlay, onMove, onJump, containerRef }: { lesson: LessonDocument; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void; onJump: (diagram: DiagramLink) => void; containerRef: RefObject<HTMLElement | null> }) {
+  return <article ref={containerRef} className="narrative" aria-label={`Complete ${lesson.title} source text`}>
+    {lesson.blocks.map((block, index) => {
+      const previousSpan = lesson.blocks[index - 1]?.sourceSpanId;
+      const region = block.sourceSpanId !== previousSpan ? <SourceRegion lesson={lesson} spanId={block.sourceSpanId} /> : null;
+      const item = overlay.items[block.id];
+      const text = item?.decision === "accepted" && item.correctedText !== undefined ? item.correctedText : "text" in block ? block.text : "";
+      let content: ReactNode;
+      if (block.type === "heading") content = <h2 className="source-heading"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></h2>;
+      else if (block.type === "diagram") {
+        const diagram = diagramById(lesson, block.diagramId);
+        content = <DiagramCard diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />;
+      } else if (block.type === "variation") {
+        const diagram = block.diagramId ? diagramById(lesson, block.diagramId) : null;
+        content = <details className="variation-card"><summary><span>Sideline</span><strong>{block.title}</strong><small>Open complete source variation</small></summary><div className="variation-body"><p><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />}</div></details>;
+      } else if (block.type === "move-sequence") content = <div className="main-move-block"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></div>;
+      else if (block.type === "assessment") content = <blockquote className="final-assessment"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></blockquote>;
+      else content = <p className="lesson-prose"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>;
+      return <div className="narrative-block" data-block-id={block.id} key={block.id}>{region}{content}</div>;
+    })}
+  </article>;
+});
 
 function EvaluationRail({ score, flipped }: { score: EngineScore | null; flipped: boolean }) {
   const whiteFraction = scoreToWhiteFraction(score);
@@ -280,7 +357,9 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
   const [engineError, setEngineError] = useState<string | null>(null);
   const [analysisRequested, setAnalysisRequested] = useState(false);
   const engineClientRef = useRef<StockfishClient | null>(null);
+  const engineClientLoadRef = useRef<Promise<StockfishClient> | null>(null);
   const engineUnsubscribeRef = useRef<(() => void) | null>(null);
+  const narrativeRef = useRef<HTMLElement | null>(null);
   const currentFenRef = useRef(displayedFen);
   const analysisRequestedRef = useRef(false);
   const expectedSearchIdRef = useRef<number | null>(null);
@@ -307,8 +386,13 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
     setEngineAnalysis(null);
     setAnalysisMoves([]);
   };
-  const selectMove = (lineId: string, moveIndex: number) => setActivePosition({ lineId, ply: localMovePly(lesson, lineId, moveIndex, overlay) });
-  const jumpDiagram = (diagram: DiagramLink) => diagram.lineId === null || diagram.moveIndex === null ? setActivePosition(config.defaultPosition) : selectMove(diagram.lineId, diagram.moveIndex);
+  const selectMove = useCallback((lineId: string, moveIndex: number) => {
+    setActivePosition({ lineId, ply: localMovePly(lesson, lineId, moveIndex) });
+  }, [lesson, setActivePosition]);
+  const jumpDiagram = useCallback((diagram: DiagramLink) => {
+    if (diagram.lineId === null || diagram.moveIndex === null) setActivePosition(config.defaultPosition);
+    else selectMove(diagram.lineId, diagram.moveIndex);
+  }, [config.defaultPosition, selectMove, setActivePosition]);
 
   const setEngineFailure = useCallback((error: unknown) => {
     if (!mountedRef.current) return;
@@ -322,35 +406,44 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
     setEngineError(error instanceof Error ? error.message : "Stockfish could not analyze this position.");
   }, []);
 
-  const ensureEngineClient = () => {
+  const ensureEngineClient = useCallback(async () => {
     if (engineClientRef.current) return engineClientRef.current;
-    const client = new StockfishClient();
-    const unsubscribe = client.subscribe((event: StockfishEvent) => {
-      if (!mountedRef.current) return;
-      const previousPhase = enginePhaseRef.current;
-      enginePhaseRef.current = event.phase;
-      setEnginePhase(event.phase);
-      if (event.phase === "error") {
-        analysisRequestedRef.current = false;
-        setAnalysisRequested(false);
-        setEngineAnalysis(null);
-        setEngineError(event.error ?? "Stockfish failed to load.");
-        return;
-      }
-      setEngineError(event.error);
-      const matchesDisplayedSearch = event.analysis
-        && event.analysis.fen === currentFenRef.current
-        && event.analysis.searchId === expectedSearchIdRef.current;
-      setEngineAnalysis(matchesDisplayedSearch ? event.analysis : null);
-      if (previousPhase === "searching" && event.phase === "ready" && analysisRequestedRef.current) {
-        analysisRequestedRef.current = false;
-        setAnalysisRequested(false);
-      }
+    if (engineClientLoadRef.current) return engineClientLoadRef.current;
+    const load = import("./stockfish-client").then(({ StockfishClient: Client }) => {
+      if (!mountedRef.current) throw new Error("Stockfish loading was cancelled.");
+      const client = new Client();
+      const unsubscribe = client.subscribe((event: StockfishEvent) => {
+        if (!mountedRef.current) return;
+        const previousPhase = enginePhaseRef.current;
+        const displayPhase = event.phase === "uninitialized" && analysisRequestedRef.current ? "loading" : event.phase;
+        enginePhaseRef.current = displayPhase;
+        setEnginePhase(displayPhase);
+        if (event.phase === "error") {
+          analysisRequestedRef.current = false;
+          setAnalysisRequested(false);
+          setEngineAnalysis(null);
+          setEngineError(event.error ?? "Stockfish failed to load.");
+          return;
+        }
+        setEngineError(event.error);
+        const matchesDisplayedSearch = event.analysis
+          && event.analysis.fen === currentFenRef.current
+          && event.analysis.searchId === expectedSearchIdRef.current;
+        setEngineAnalysis(matchesDisplayedSearch ? event.analysis : null);
+        if (previousPhase === "searching" && event.phase === "ready" && analysisRequestedRef.current) {
+          analysisRequestedRef.current = false;
+          setAnalysisRequested(false);
+        }
+      });
+      engineClientRef.current = client;
+      engineUnsubscribeRef.current = unsubscribe;
+      return client;
+    }).finally(() => {
+      engineClientLoadRef.current = null;
     });
-    engineClientRef.current = client;
-    engineUnsubscribeRef.current = unsubscribe;
-    return client;
-  };
+    engineClientLoadRef.current = load;
+    return load;
+  }, []);
 
   const requestAnalysis = useCallback((client: StockfishClient, fen: string) => {
     const requestToken = ++analysisRequestTokenRef.current;
@@ -363,32 +456,54 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
     }).catch(setEngineFailure);
   }, [setEngineFailure]);
 
-  const toggleAnalysis = () => {
+  const toggleAnalysis = async () => {
     if (enginePhase === "loading" || enginePhase === "stopping" || enginePhase === "restarting" || enginePhase === "error") return;
-    const client = ensureEngineClient();
     if (analysisRequestedRef.current || enginePhase === "searching") {
       analysisRequestedRef.current = false;
       analysisRequestTokenRef.current += 1;
       setAnalysisRequested(false);
-      void client.stop().catch(setEngineFailure);
+      if (engineClientRef.current) void engineClientRef.current.stop().catch(setEngineFailure);
       return;
     }
     analysisRequestedRef.current = true;
+    enginePhaseRef.current = "loading";
     setAnalysisRequested(true);
+    setEnginePhase("loading");
     setEngineAnalysis(null);
     setEngineError(null);
-    requestAnalysis(client, displayedFen);
+    try {
+      const client = await ensureEngineClient();
+      if (!mountedRef.current || !analysisRequestedRef.current) return;
+      requestAnalysis(client, currentFenRef.current);
+    } catch (error) {
+      setEngineFailure(error);
+    }
   };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      if (event.key === "ArrowRight") setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId, overlay).length, value.ply + 1) }));
+      if (event.key === "ArrowRight") setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId).length, value.ply + 1) }));
       if (event.key === "ArrowLeft") setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [overlay, setActivePosition]);
+  }, [lesson, setActivePosition]);
+
+  useEffect(() => {
+    const root = narrativeRef.current;
+    if (!root) return;
+    root.querySelectorAll<HTMLElement>(".inline-move.active").forEach((element) => {
+      element.classList.remove("active");
+      element.removeAttribute("aria-current");
+    });
+    const activeMoveId = position.activeMove?.id;
+    if (!activeMoveId) return;
+    root.querySelectorAll<HTMLElement>(`[data-move-id="${CSS.escape(activeMoveId)}"]`).forEach((element) => {
+      element.classList.add("active");
+      element.setAttribute("aria-current", "true");
+    });
+  }, [overlay, position.activeMove?.id]);
 
   useEffect(() => {
     currentFenRef.current = displayedFen;
@@ -407,6 +522,7 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
       engineUnsubscribeRef.current = null;
       engineClientRef.current?.dispose();
       engineClientRef.current = null;
+      engineClientLoadRef.current = null;
       expectedSearchIdRef.current = null;
       analysisRequestTokenRef.current += 1;
     };
@@ -452,8 +568,8 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
             <button onClick={() => setActivePosition((value) => ({ ...value, ply: 0 }))} aria-label="Go to line start">|‹</button>
             <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }))} aria-label="Previous move">‹</button>
             <span>{moveLabel}</span>
-            <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId, overlay).length, value.ply + 1) }))} aria-label="Next move">›</button>
-            <button onClick={() => setActivePosition((value) => ({ ...value, ply: linePath(lesson, value.lineId, overlay).length }))} aria-label="Go to line end">›|</button>
+            <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId).length, value.ply + 1) }))} aria-label="Next move">›</button>
+            <button onClick={() => setActivePosition((value) => ({ ...value, ply: linePath(lesson, value.lineId).length }))} aria-label="Go to line end">›|</button>
           </div>
           {analysisMoves.length > 0 && <div className="analysis-branch-controls" aria-label="Analysis branch controls">
             <span>Analysis branch · {analysisMoves.length} {analysisMoves.length === 1 ? "ply" : "plies"}</span>
@@ -468,26 +584,7 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
         </div>
         <div className="active-line"><span>{analysisMoves.length ? "Analysis from" : "Active line"}</span><strong>{lineById(lesson, active.lineId).label}</strong>{analysisMoves.length > 0 && <small>{analysisMoves.length} exploratory {analysisMoves.length === 1 ? "move" : "moves"}; lesson source remains unchanged.</small>}{!position.valid && <small>Manual SAN correction is not legal; showing verified baseline position.</small>}</div>
       </aside>
-      <article className="narrative" aria-label={`Complete ${config.label} source text`}>
-        {lesson.blocks.map((block, index) => {
-          const previousSpan = lesson.blocks[index - 1]?.sourceSpanId;
-          const region = block.sourceSpanId !== previousSpan ? <SourceRegion lesson={lesson} spanId={block.sourceSpanId} /> : null;
-          const item = overlay.items[block.id];
-          const text = item?.decision === "accepted" && item.correctedText !== undefined ? item.correctedText : "text" in block ? block.text : "";
-          let content: ReactNode;
-          if (block.type === "heading") content = <h2 className="source-heading"><RichText lesson={lesson} text={text} refs={block.moveRefs} activeMoveId={position.activeMove?.id} overlay={overlay} onMove={selectMove} /></h2>;
-          else if (block.type === "diagram") {
-            const diagram = diagramById(lesson, block.diagramId);
-            content = <DiagramCard diagram={diagram} overlay={overlay} onJump={() => jumpDiagram(diagram)} />;
-          } else if (block.type === "variation") {
-            const diagram = block.diagramId ? diagramById(lesson, block.diagramId) : null;
-            content = <details className="variation-card"><summary><span>Sideline</span><strong>{block.title}</strong><small>Open complete source variation</small></summary><div className="variation-body"><p><RichText lesson={lesson} text={text} refs={block.moveRefs} activeMoveId={position.activeMove?.id} overlay={overlay} onMove={selectMove} /></p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => jumpDiagram(diagram)} />}</div></details>;
-          } else if (block.type === "move-sequence") content = <div className="main-move-block"><RichText lesson={lesson} text={text} refs={block.moveRefs} activeMoveId={position.activeMove?.id} overlay={overlay} onMove={selectMove} /></div>;
-          else if (block.type === "assessment") content = <blockquote className="final-assessment"><RichText lesson={lesson} text={text} refs={block.moveRefs} activeMoveId={position.activeMove?.id} overlay={overlay} onMove={selectMove} /></blockquote>;
-          else content = <p className="lesson-prose"><RichText lesson={lesson} text={text} refs={block.moveRefs} activeMoveId={position.activeMove?.id} overlay={overlay} onMove={selectMove} /></p>;
-          return <div className="narrative-block" data-block-id={block.id} key={block.id}>{region}{content}</div>;
-        })}
-      </article>
+      <Narrative lesson={lesson} overlay={overlay} onMove={selectMove} onJump={jumpDiagram} containerRef={narrativeRef} />
     </section>
   </main>;
 }
@@ -505,7 +602,7 @@ function ReviewView({ config, overlay, setOverlay }: { config: ChapterConfig; ov
     {tab === "text" && <div className="review-list">{textBlocks.map((block) => {
       const item = overlay.items[block.id] ?? { decision: "pending" as const };
       const span = spanById(lesson, block.sourceSpanId);
-      return <article className="review-card" key={block.id}><div className="review-card-meta"><span>{block.id}</span><strong>Page {span.printedPage} · {span.column}</strong><details><summary>View crop</summary><img src={span.crop} alt={`Source crop for ${block.id}`} /></details></div><div><label>Source-verified text<textarea rows={Math.max(3, Math.ceil(block.text.length / 85))} value={item.correctedText ?? block.text} onChange={(event) => updateItem(block.id, { correctedText: event.target.value })} /></label><Decision value={item.decision} onChange={(decision) => updateItem(block.id, { decision })} /></div></article>;
+      return <article className="review-card" key={block.id}><div className="review-card-meta"><span>{block.id}</span><strong>Page {span.printedPage} · {span.column}</strong><details><summary>View crop</summary><img loading="lazy" decoding="async" src={span.crop} alt={`Source crop for ${block.id}`} /></details></div><div><label>Source-verified text<textarea rows={Math.max(3, Math.ceil(block.text.length / 85))} value={item.correctedText ?? block.text} onChange={(event) => updateItem(block.id, { correctedText: event.target.value })} /></label><Decision value={item.decision} onChange={(decision) => updateItem(block.id, { decision })} /></div></article>;
     })}</div>}
     {tab === "moves" && <div className="review-list">{annotatedMoves.map((move) => {
       const item = overlay.items[move.id] ?? { decision: "pending" as const };
@@ -515,7 +612,7 @@ function ReviewView({ config, overlay, setOverlay }: { config: ChapterConfig; ov
       const item = overlay.items[diagram.id] ?? { decision: "pending" as const, confidence: "unreviewed" as const };
       const fen = item.correctedFen ?? diagram.fen;
       let valid = true; try { new Chess(fen); } catch { valid = false; }
-      return <article className="review-card board-review" key={diagram.id}><div className="review-card-meta"><span>{diagram.id} · printed source</span><img src={diagram.crop} alt={`${diagram.id} source diagram`} /></div><div className="board-review-body"><div className="mini-board"><Chessboard fen={valid ? fen : diagram.fen} /></div><div><h2>{diagram.role}</h2><p className="status-line">Association: {diagram.associationStatus} · Position: {diagram.positionStatus} · Identity: {diagram.boardIdentityStatus}</p><label>Candidate FEN<input className={!valid ? "invalid" : ""} value={fen} onChange={(event) => updateItem(diagram.id, { correctedFen: event.target.value })} /></label><label>Comparison confidence<select value={item.confidence ?? "unreviewed"} onChange={(event) => updateItem(diagram.id, { confidence: event.target.value as ReviewItem["confidence"] })}><option>unreviewed</option><option>visually plausible</option><option>manually confirmed</option></select></label><label>Reviewer note<textarea rows={2} value={item.note ?? ""} onChange={(event) => updateItem(diagram.id, { note: event.target.value })} /></label><p className={valid ? "validity valid" : "validity invalid-text"}>{valid ? "✓ Legal FEN syntax" : "Invalid FEN - correction required"}</p><Decision value={item.decision} onChange={(decision) => updateItem(diagram.id, { decision })} /></div></div></article>;
+      return <article className="review-card board-review" key={diagram.id}><div className="review-card-meta"><span>{diagram.id} · printed source</span><img loading="lazy" decoding="async" src={diagram.crop} alt={`${diagram.id} source diagram`} /></div><div className="board-review-body"><div className="mini-board"><Chessboard fen={valid ? fen : diagram.fen} /></div><div><h2>{diagram.role}</h2><p className="status-line">Association: {diagram.associationStatus} · Position: {diagram.positionStatus} · Identity: {diagram.boardIdentityStatus}</p><label>Candidate FEN<input className={!valid ? "invalid" : ""} value={fen} onChange={(event) => updateItem(diagram.id, { correctedFen: event.target.value })} /></label><label>Comparison confidence<select value={item.confidence ?? "unreviewed"} onChange={(event) => updateItem(diagram.id, { confidence: event.target.value as ReviewItem["confidence"] })}><option>unreviewed</option><option>visually plausible</option><option>manually confirmed</option></select></label><label>Reviewer note<textarea rows={2} value={item.note ?? ""} onChange={(event) => updateItem(diagram.id, { note: event.target.value })} /></label><p className={valid ? "validity valid" : "validity invalid-text"}>{valid ? "✓ Legal FEN syntax" : "Invalid FEN - correction required"}</p><Decision value={item.decision} onChange={(decision) => updateItem(diagram.id, { decision })} /></div></div></article>;
     })}</div>}
   </main>;
 }
@@ -567,7 +664,7 @@ export default function CatalanApp({ chapterId = "1", initialView = "lesson" }: 
       setEditorMode(localStorage.getItem(EDITOR_KEY) === "true");
     }, 0);
     return () => window.clearTimeout(hydrationTask);
-  }, []);
+  }, [config]);
   const setOverlay = (value: ReviewOverlay) => { setOverlayState(value); localStorage.setItem(config.reviewKey, JSON.stringify(value)); };
   const toggleEditor = () => { const next = !editorMode; setEditorMode(next); localStorage.setItem(EDITOR_KEY, String(next)); if (!next) setView("lesson"); };
   const navigate = (next: View) => { setView(next); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };

@@ -256,6 +256,7 @@ input.invalid { border-color: #c44b42; }
 .active-line strong { font-size: 12px; }
 .active-line small { display: block; width: 100%; color: #9f3e35; }
 .narrative { min-width: 0; padding-bottom: 80px; }
+.narrative-block, .review-card { content-visibility: auto; contain-intrinsic-size: auto 220px; }
 .narrative-block { scroll-margin-top: calc(var(--topbar) + 20px); }
 .source-region { margin: 8px 0 25px; padding: 13px 15px; border: 1px solid #cbd7d0; border-radius: 10px; color: var(--forest); background: #e8eee9; }
 .source-region > span { display: block; color: var(--forest-2); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
