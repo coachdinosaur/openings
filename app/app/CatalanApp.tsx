@@ -226,7 +226,7 @@ const Chessboard = memo(function Chessboard({ fen, flipped = false, onMove, last
       const isLastMove = lastMove?.from === square || lastMove?.to === square;
       const classes = `square ${light ? "light" : "dark"} ${interactive ? "interactive" : ""} ${isSelected ? "selected" : ""} ${options.length ? "legal-target" : ""} ${options.some((target) => target.capture) ? "capture-target" : ""} ${isLastMove ? "last-move" : ""}`;
       const content = <>
-        {piece && <img draggable={false} decoding="async" src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`} alt={`${piece.color === "w" ? "White" : "Black"} ${piece.type}`} />}
+        {piece && <img data-color={piece.color} data-piece={piece.type} draggable={false} decoding="async" src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`} alt={`${piece.color === "w" ? "White" : "Black"} ${piece.type}`} />}
         {file === files[0] && <span className="rank-label">{rank}</span>}
         {rank === ranks[ranks.length - 1] && <span className="file-label">{file}</span>}
       </>;
