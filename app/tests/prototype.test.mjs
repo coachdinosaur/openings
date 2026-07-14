@@ -142,6 +142,8 @@ test("server renders the complete Chapter 1 learner view with editor tools hidde
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Complete Chapter 1/);
+  assert.match(html, /class="sr-only"/);
+  assert.doesNotMatch(html, /class="lesson-heading"|Read the complete chapter in verified two-column order|Source text verified/);
   assert.match(html, /This is our starting position for the Catalan/);
   assert.match(html, /A\) 4\.\.\.g6/);
   assert.match(html, /B1\) 8\.\.\.Re8/);
