@@ -19,6 +19,13 @@ h1, h2, p { margin-top: 0; }
 h1, h2 { font-family: Manrope, Inter, sans-serif; letter-spacing: -.035em; }
 svg { width: 22px; height: 22px; }
 
+.page-loader { min-height: 100svh; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; color: var(--forest); }
+.page-loader-mark { width: 52px; height: 52px; display: grid; place-items: center; border: 3px solid var(--mint); border-top-color: var(--forest-2); border-radius: 50%; animation: page-loader-spin .8s linear infinite; }
+.page-loader-mark span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: white; background: var(--forest); font: 700 19px Manrope, Inter, sans-serif; animation: page-loader-counter-spin .8s linear infinite; }
+.page-loader p { margin: 0; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .03em; }
+@keyframes page-loader-spin { to { transform: rotate(360deg); } }
+@keyframes page-loader-counter-spin { to { transform: rotate(-360deg); } }
+
 .app-shell { min-height: 100vh; }
 .topbar { height: var(--topbar); position: fixed; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; padding: 0 26px; background: rgba(255,253,248,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
 .brand { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--ink); text-align: left; padding: 0; }
@@ -231,7 +238,10 @@ input.invalid { border-color: #c44b42; }
   .import-result dl div { grid-template-columns: 1fr; }
   .principles > div { grid-template-columns: 1fr; }
 }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; }
+  .page-loader-mark, .page-loader-mark span { animation: none; }
+}
 
 /* Source-complete guided lesson */
 .guided-layout { display: grid; grid-template-columns: minmax(360px, 483px) minmax(380px, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
