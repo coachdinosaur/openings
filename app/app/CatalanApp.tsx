@@ -1,10 +1,12 @@
 "use client";
 
-import { ChangeEvent, memo, ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, memo, MouseEvent, ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Chess, Square } from "chess.js";
+import { useRouter } from "next/navigation";
 import { B2_LESSON } from "./b2-lesson";
 import { CHAPTERS, chapterConfig, type ChapterConfig, type ChapterId } from "./chapter-config";
 import { canonicalize, sha256 } from "./canonical";
+import LessonLoading from "./LessonLoading";
 import type { DiagramLink, ImportComparison, LessonDocument, MoveReference, ReviewItem, ReviewOverlay, VariationMove, VariationNode } from "./lesson-model";
 import { legalTargets, playAnalysisMove } from "./board-analysis";
 import type { AnalysisMove, BoardMoveInput, PromotionPiece } from "./board-analysis";
@@ -16,6 +18,7 @@ type ReviewTab = "text" | "moves" | "boards";
 
 const LEGACY_REVIEW_KEY = "catalan-b2-review-v1";
 const EDITOR_KEY = "catalan-editor-mode-v1";
+const CHAPTER_NAVIGATION_PAINT_DELAY_MS = 120;
 
 const lessonLineIndexes = new WeakMap<LessonDocument, Map<string, VariationNode>>();
 const lessonSpanIndexes = new WeakMap<LessonDocument, Map<string, LessonDocument["sourceSpans"][number]>>();
@@ -335,10 +338,8 @@ function EvaluationRail({ score, flipped }: { score: EngineScore | null; flipped
   const segments = flipped
     ? [{ side: "white", height: whitePercent }, { side: "black", height: blackPercent }]
     : [{ side: "black", height: blackPercent }, { side: "white", height: whitePercent }];
-  const label = score?.label ?? "—";
-  return <div className={`evaluation-rail ${score ? "" : "unknown"}`} role="img" aria-label={score ? `Engine evaluation ${label}, positive favors White` : "Engine evaluation unavailable"} data-orientation={flipped ? "flipped" : "normal"}>
-    {score && <div className="evaluation-segments" aria-hidden="true">{segments.map((segment) => <div key={segment.side} className={`evaluation-segment ${segment.side}`} style={{ height: `${segment.height}%` }} />)}</div>}
-    <span className="evaluation-label" aria-hidden="true">{label}</span>
+  return <div className="evaluation-rail" role="img" aria-label={score ? "Engine evaluation" : "Neutral engine evaluation, equal split"} data-orientation={flipped ? "flipped" : "normal"}>
+    <div className="evaluation-segments" aria-hidden="true">{segments.map((segment) => <div key={segment.side} className={`evaluation-segment ${segment.side}`} style={{ height: `${segment.height}%` }} />)}</div>
   </div>;
 }
 
@@ -653,10 +654,14 @@ function ImportView({ config, overlay }: { config: ChapterConfig; overlay: Revie
 
 export default function CatalanApp({ chapterId = "1", initialView = "lesson" }: { chapterId?: ChapterId; initialView?: View }) {
   const config = chapterConfig(chapterId);
+  const router = useRouter();
   const [view, setView] = useState<View>(initialView);
   const [overlay, setOverlayState] = useState<ReviewOverlay>(emptyOverlay(config.lesson));
   const [editorMode, setEditorMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [chapterTarget, setChapterTarget] = useState<ChapterConfig>();
+  const [, startChapterTransition] = useTransition();
   useEffect(() => {
     const hydrationTask = window.setTimeout(() => {
       setOverlayState(migrateReview(config));
@@ -667,11 +672,19 @@ export default function CatalanApp({ chapterId = "1", initialView = "lesson" }: 
   const setOverlay = (value: ReviewOverlay) => { setOverlayState(value); localStorage.setItem(config.reviewKey, JSON.stringify(value)); };
   const toggleEditor = () => { const next = !editorMode; setEditorMode(next); localStorage.setItem(EDITOR_KEY, String(next)); if (!next) setView("lesson"); };
   const navigate = (next: View) => { setView(next); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  return <div className="app-shell">
-    <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation">☰</button><button className="brand" onClick={() => navigate("lesson")}><span className="brand-mark">C</span><span><strong>Catalan Atelier</strong><small>{config.label}</small></span></button></header>
-    <aside className={`sidebar ${menuOpen ? "open" : ""}`}><nav><p>Course</p>{CHAPTERS.map((chapter) => <a className={`course-link ${chapter.id === config.id ? "active" : ""}`} href={`/chapters/${chapter.id}`} key={chapter.id}><span className="nav-glyph">{chapter.id}</span><span>{chapter.label}</span></a>)}{editorMode && <><p className="editor-nav-label">Editor tools</p><a className={view === "review" ? "active" : ""} href={`/chapters/${config.id}/review`}><span className="nav-glyph">R</span><span>Source review</span></a><a className={view === "import" ? "active" : ""} href={`/chapters/${config.id}/import`}><span className="nav-glyph">I</span><span>Re-import</span></a></>}</nav><div className="sidebar-footer"><div className="source-card"><span>Verified source</span><strong>{config.importDefinition.filename}</strong><small>SHA-256 · {config.importDefinition.sourceHash.slice(0, 4)}...{config.importDefinition.sourceHash.slice(-4)}</small></div><button className={`editor-toggle ${editorMode ? "on" : ""}`} onClick={toggleEditor} role="switch" aria-checked={editorMode}><span className="toggle-track"><i /></span><strong>Editor mode</strong></button></div></aside>
+  const navigateChapter = (event: MouseEvent<HTMLAnchorElement>, chapter: ChapterConfig) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || chapter.id === config.id) return;
+    event.preventDefault();
+    setMenuOpen(false);
+    setChapterTarget(chapter);
+    window.setTimeout(() => startChapterTransition(() => router.push(`/chapters/${chapter.id}`)), CHAPTER_NAVIGATION_PAINT_DELAY_MS);
+  };
+  return <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <header className="topbar"><button className="sidebar-toggle desktop-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Show navigation" : "Hide navigation"} aria-expanded={!sidebarCollapsed} aria-controls="course-sidebar">☰</button><button className="sidebar-toggle menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="course-sidebar">☰</button><button className="brand" onClick={() => navigate("lesson")}><span className="brand-mark">C</span><span><strong>Catalan Atelier</strong><small>{config.label}</small></span></button></header>
+    <aside id="course-sidebar" className={`sidebar ${menuOpen ? "open" : ""}`}><nav><p>Course</p>{CHAPTERS.map((chapter) => <a className={`course-link ${chapter.id === config.id ? "active" : ""}`} href={`/chapters/${chapter.id}`} onClick={(event) => navigateChapter(event, chapter)} key={chapter.id}><span className="nav-glyph">{chapter.id}</span><span>{chapter.label}</span></a>)}{editorMode && <><p className="editor-nav-label">Editor tools</p><a className={view === "review" ? "active" : ""} href={`/chapters/${config.id}/review`}><span className="nav-glyph">R</span><span>Source review</span></a><a className={view === "import" ? "active" : ""} href={`/chapters/${config.id}/import`}><span className="nav-glyph">I</span><span>Re-import</span></a></>}</nav><div className="sidebar-footer"><div className="source-card"><span>Verified source</span><strong>{config.importDefinition.filename}</strong><small>SHA-256 · {config.importDefinition.sourceHash.slice(0, 4)}...{config.importDefinition.sourceHash.slice(-4)}</small></div><button className={`editor-toggle ${editorMode ? "on" : ""}`} onClick={toggleEditor} role="switch" aria-checked={editorMode}><span className="toggle-track"><i /></span><strong>Editor mode</strong></button></div></aside>
     {menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
-    <div className="chapter-switcher" aria-label="Chapters">{CHAPTERS.map((chapter) => <a className={config.id === chapter.id ? "active" : ""} data-chapter-id={chapter.id} href={`/chapters/${chapter.id}`} key={chapter.id}>{chapter.label}</a>)}</div>
+    <div className="chapter-switcher" aria-label="Chapters">{CHAPTERS.map((chapter) => <a className={config.id === chapter.id ? "active" : ""} data-chapter-id={chapter.id} href={`/chapters/${chapter.id}`} onClick={(event) => navigateChapter(event, chapter)} key={chapter.id}>{chapter.label}</a>)}</div>
     <div className="content">{view === "lesson" ? <LessonView config={config} overlay={overlay} /> : view === "review" && editorMode ? <ReviewView config={config} overlay={overlay} setOverlay={setOverlay} /> : view === "import" && editorMode ? <ImportView config={config} overlay={overlay} /> : <LessonView config={config} overlay={overlay} />}</div>
+    {chapterTarget && chapterTarget.id !== config.id && <LessonLoading label={`Loading ${chapterTarget.label}…`} overlay />}
   </div>;
 }

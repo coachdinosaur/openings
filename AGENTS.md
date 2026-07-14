@@ -1,5 +1,5 @@
 # Repository instructions
 
-For any request to add, rebuild, finish, or validate a Catalan PDF chapter, use the project skill at `.agents/skills/add-catalan-chapter/SKILL.md` and follow every completion gate. Never add chapter-specific navigation or route files; publish a chapter package and regenerate the registry.
+For any request to add, rebuild, finish, or validate a Catalan PDF chapter, use the project skill at `.agents/skills/add-catalan-chapter/SKILL.md` and follow every completion gate. If the requested work needs an unpublished chapter, add the next sequential chapter package only when its complete lesson, evidence assets, canonical hash, import verification, tests, and visual checks pass. Never add chapter-specific navigation or route files; publish a chapter package and regenerate the registry.
 
-`Chapter3_Catalan.pdf` is currently staged source input, not a published chapter. Do not expose it in the app until its complete lesson, evidence assets, package, canonical hash, tests, and visual checks pass.
+Treat any root `ChapterN_Catalan.pdf` without a matching published package as staged source input. Staged PDFs must remain hidden from the app until every publication gate passes. Use `npm run chapters:check` from `app/` to determine the published chapters and next expected chapter instead of hard-coding that state here.

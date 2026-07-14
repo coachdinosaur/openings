@@ -79,6 +79,37 @@ test("publishes only registered packages through shared chapter routes", async (
   ]);
 });
 
+test("shows the lesson loader during client-side chapter changes", async () => {
+  const [app, loading, sharedLoader, styles] = await Promise.all([
+    readFile(new URL("app/CatalanApp.tsx", root), "utf8"),
+    readFile(new URL("app/loading.tsx", root), "utf8"),
+    readFile(new URL("app/LessonLoading.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  assert.match(app, /CHAPTER_NAVIGATION_PAINT_DELAY_MS = 120/);
+  assert.match(app, /setTimeout\(\(\) => startChapterTransition\(\(\) => router\.push\(`\/chapters\/\$\{chapter\.id\}`\)\), CHAPTER_NAVIGATION_PAINT_DELAY_MS\)/);
+  assert.equal((app.match(/onClick=\{\(event\) => navigateChapter\(event, chapter\)\}/g) ?? []).length, 2, "sidebar and compact chapter controls must both use transition navigation");
+  assert.match(app, /chapterTarget && chapterTarget\.id !== config\.id && <LessonLoading/);
+  assert.match(loading, /<LessonLoading \/>/);
+  assert.match(sharedLoader, /chapter-loader-overlay/);
+  assert.match(styles, /\.chapter-loader-overlay\s*\{/);
+});
+
+test("collapses the desktop sidebar and releases its full content width", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("app/CatalanApp.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  assert.match(app, /const \[sidebarCollapsed, setSidebarCollapsed\] = useState\(false\)/);
+  assert.match(app, /app-shell \$\{sidebarCollapsed \? "sidebar-collapsed" : ""\}/);
+  assert.match(app, /setSidebarCollapsed\(\(value\) => !value\)/);
+  assert.match(app, /aria-expanded=\{!sidebarCollapsed\}/);
+  assert.match(app, /aria-controls="course-sidebar"/);
+  assert.match(styles, /\.app-shell\.sidebar-collapsed \.sidebar\s*\{[^}]*transform:\s*translateX\(-100%\)/s);
+  assert.match(styles, /\.app-shell\.sidebar-collapsed \.content\s*\{[^}]*padding-left:\s*0/s);
+  assert.match(styles, /\.content\s*\{[^}]*transition:\s*padding-left \.22s ease/s);
+});
+
 test("packages Chapter 3 in verified source order with all 44 diagrams", async () => {
   const { CHAPTER3_LESSON } = await loadChapter3();
   assert.equal(CHAPTER3_LESSON.source.filename, "Chapter3_Catalan.pdf");
@@ -248,7 +279,7 @@ test("server renders the complete Chapter 1 learner view with editor tools hidde
   assert.match(html, /This seems like the only move that demands any real accuracy from White/);
   assert.match(html, /White(?:’|&#x2019;)s chances are definitely preferable/);
   assert.match(html, /Stockfish principal variation/);
-  assert.match(html, /Engine evaluation unavailable/);
+  assert.match(html, /Neutral engine evaluation, equal split/);
   assert.match(html, /Analyze current position with Stockfish/);
   assert.match(html, />Analyze</);
   assert.match(html, /Editor mode/);
@@ -404,7 +435,12 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   const [app, config, client, css, launcher, vinextPatch] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), Promise.all([readFile(new URL("app/chapter-config.ts", root), "utf8"), readFile(new URL("app/chapter-packages/chapter-1.ts", root), "utf8")]).then((parts) => parts.join("\n")), readFile(new URL("app/stockfish-client.ts", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8"), readFile(new URL("scripts/patch-vinext-static.mjs", root), "utf8")]);
   assert.match(css, /\.board\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*1fr\)[^}]*grid-template-rows:\s*repeat\(8,\s*1fr\)/s);
   assert.match(css, /\.board-analysis-row\s*\{[^}]*display:\s*flex[^}]*align-items:\s*stretch/s);
-  assert.match(css, /\.evaluation-rail\s*\{[^}]*flex:\s*0 0 16px/s);
+  assert.match(css, /\.evaluation-rail\s*\{[^}]*flex:\s*0 0 8px/s);
+  assert.doesNotMatch(css, /\.evaluation-label|\.evaluation-rail\.unknown/);
+  assert.match(app, /flipped\s*\?\s*\[\{ side: "white", height: whitePercent \}, \{ side: "black", height: blackPercent \}\]/);
+  assert.match(app, /:\s*\[\{ side: "black", height: blackPercent \}, \{ side: "white", height: whitePercent \}\]/);
+  assert.match(app, /whiteFraction \?\? 0\.5/);
+  assert.doesNotMatch(app, /evaluation-label/);
   assert.match(css, /\.analysis-pv\s*\{[^}]*height:\s*38px/s);
   assert.match(css, /\.narrative\s*\{[^}]*--lesson-content-size:\s*16px/s);
   assert.match(css, /\.source-heading\s*\{[^}]*font:\s*750 var\(--lesson-content-size\)\/1\.7 Manrope/s);
