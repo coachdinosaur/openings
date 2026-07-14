@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Catalan Chapter"
+  short_description: "Publish verified PDF chapters consistently"
+  default_prompt: "Use $add-catalan-chapter to add the next Catalan PDF chapter to the app."

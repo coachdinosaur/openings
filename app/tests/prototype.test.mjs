@@ -21,6 +21,13 @@ async function loadChapter2() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadChapter3() {
+  const source = await readFile(new URL("app/chapter3-lesson.ts", root), "utf8");
+  let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  output = output.replace(/from ["']chess\.js["']/, `from ${JSON.stringify(import.meta.resolve("chess.js"))}`);
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadBoardAnalysis() {
   const source = await readFile(new URL("app/board-analysis.ts", root), "utf8");
   let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -52,16 +59,97 @@ async function render(path = "/") {
   return worker.fetch(new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
 
+test("publishes only registered packages through shared chapter routes", async () => {
+  const [registry, app, chapter3, unpublished] = await Promise.all([
+    readFile(new URL("app/chapter-registry.generated.ts", root), "utf8"),
+    readFile(new URL("app/CatalanApp.tsx", root), "utf8"),
+    render("/chapters/3"),
+    render("/chapters/4"),
+  ]);
+  assert.match(registry, /"1": CHAPTER_1_CONFIG/);
+  assert.match(registry, /"2": CHAPTER_2_CONFIG/);
+  assert.match(registry, /"3": CHAPTER_3_CONFIG/);
+  assert.match(app, /CHAPTERS\.map/);
+  assert.equal(chapter3.status, 200, "the verified Chapter 3 package should publish automatically");
+  assert.equal(unpublished.status, 404, "an unregistered chapter must remain unpublished");
+  await Promise.all([
+    access(new URL("app/chapters/[chapterId]/page.tsx", root)),
+    access(new URL("app/chapters/[chapterId]/review/page.tsx", root)),
+    access(new URL("app/chapters/[chapterId]/import/page.tsx", root)),
+  ]);
+});
+
+test("packages Chapter 3 in verified source order with all 44 diagrams", async () => {
+  const { CHAPTER3_LESSON } = await loadChapter3();
+  assert.equal(CHAPTER3_LESSON.source.filename, "Chapter3_Catalan.pdf");
+  assert.equal(CHAPTER3_LESSON.source.sha256, "35AD12F7AD89E7474BF434DBC34AB217E297BA20C8BB48BF2F25B45EF5F32E7A");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER3_LESSON)).digest("hex").toUpperCase(), "037FE07522CE37C6633A23ED833B00A7FD9E4353FBC3386D5EFE9CF03C46D41A");
+  assert.equal(CHAPTER3_LESSON.sourceSpans.length, 33);
+  assert.equal(CHAPTER3_LESSON.diagrams.length, 44);
+  assert.ok(CHAPTER3_LESSON.lines.length >= 20);
+  assert.ok(CHAPTER3_LESSON.blocks.length >= 100);
+  const chapter3LinkedMoves = CHAPTER3_LESSON.blocks.reduce((total, block) => total + (block.moveRefs?.length ?? 0), 0);
+  assert.ok(chapter3LinkedMoves >= 250, `expected Chapter 3 notation to be interactive, received ${chapter3LinkedMoves} move links`);
+  for (const block of CHAPTER3_LESSON.blocks) {
+    if (!("text" in block) || !/(?:^|\s)\d+\.(?:\.\.)?\s*(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8])/.test(block.text)) continue;
+    assert.ok(block.moveRefs?.length, `${block.id}: numbered chess notation must be linked`);
+  }
+  assert.deepEqual([...new Set(CHAPTER3_LESSON.blocks.map((block) => block.sourceSpanId))], CHAPTER3_LESSON.sourceSpans.map((span) => span.id));
+  const spanOrder = new Map(CHAPTER3_LESSON.sourceSpans.map((span) => [span.id, span.order]));
+  const blockOrders = CHAPTER3_LESSON.blocks.map((block) => spanOrder.get(block.sourceSpanId));
+  assert.ok(blockOrders.every((order, index) => index === 0 || order >= blockOrders[index - 1]));
+  await Promise.all(Array.from({ length: 17 }, (_, index) => access(new URL(`public/source/chapter3/pages/printed-${index + 34}.png`, root))));
+  await Promise.all(Array.from({ length: 44 }, (_, index) => access(new URL(`public/source/chapter3/crops/CH3-D${String(index + 1).padStart(2, "0")}.png`, root))));
+  for (const line of CHAPTER3_LESSON.lines) {
+    const board = new Chess(line.startFen ?? CHAPTER3_LESSON.basePosition.fen);
+    for (const move of line.moves) assert.doesNotThrow(() => board.move(move.san), `${line.id}: ${move.san}`);
+  }
+  for (const diagram of CHAPTER3_LESSON.diagrams) {
+    const line = CHAPTER3_LESSON.lines.find((candidate) => candidate.id === diagram.lineId);
+    assert.ok(line, diagram.id);
+    const board = new Chess(line.startFen);
+    line.moves.slice(0, diagram.moveIndex + 1).forEach((move) => board.move(move.san));
+    assert.equal(board.fen(), diagram.fen, diagram.id);
+  }
+  const responses = await Promise.all([render("/chapters/3"), render("/chapters/3/review"), render("/chapters/3/import")]);
+  for (const response of responses) assert.equal(response.status, 200);
+  const html = await responses[0].text();
+  assert.match(html, /Chapter 3 - Complete/);
+  assert.match(html, /Variation Index/);
+  assert.ok((html.match(/class="inline-move/g) ?? []).length >= 250, "Chapter 3 should render its move references as interactive buttons");
+  for (let index = 1; index <= 44; index += 1) assert.match(html, new RegExp(`CH3-D${String(index).padStart(2, "0")}`));
+});
+
 test("packages Chapter 2 in verified source order with all 25 diagrams", async () => {
   const { CHAPTER2_LESSON } = await loadChapter2();
   assert.equal(CHAPTER2_LESSON.source.filename, "Chapter2_Catalan.pdf");
   assert.equal(CHAPTER2_LESSON.source.sha256, "8191475E0B1E5E3B65B1B39EFDA4DB03C87072A8A199B38254FE18E1DD8098C1");
-  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER2_LESSON)).digest("hex").toUpperCase(), "E267A82A5A50825E55804E60E09B2E8BE859B6F5C7E0099CA6E8406C398F2FCA");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER2_LESSON)).digest("hex").toUpperCase(), "29884B4B2CBDDBE9AB730C169640EB2077ACB034DDD0FD75E0E2BE63637C7369");
   assert.deepEqual(CHAPTER2_LESSON.sourceSpans.slice(0, 5).map((span) => [span.printedPage, span.column, span.order]), [[24, "full", 1], [25, "left", 2], [25, "right", 3], [26, "left", 4], [26, "right", 5]]);
   assert.equal(CHAPTER2_LESSON.sourceSpans.length, 19);
   assert.equal(CHAPTER2_LESSON.diagrams.length, 25);
   assert.ok(CHAPTER2_LESSON.lines.length >= 40, `expected Chapter 1-level variation depth, received ${CHAPTER2_LESSON.lines.length} lines`);
   assert.ok(CHAPTER2_LESSON.blocks.length >= 100, `expected a complete reading stream, received ${CHAPTER2_LESSON.blocks.length} blocks`);
+  assert.ok(CHAPTER2_LESSON.blocks.reduce((total, block) => total + (block.moveRefs?.length ?? 0), 0) >= 570, "Chapter 2 should retain complete interactive notation coverage");
+  const page25Blocks = CHAPTER2_LESSON.blocks.filter((block) => block.sourceSpanId === "chapter2-p25-left" || block.sourceSpanId === "chapter2-p25-right");
+  const page25Ids = page25Blocks.map((block) => block.id);
+  const expectedPage25Order = ["ch2-opening-sequence", "ch2-d05-block", "ch2-sixth", "ch2-sixth-bc6", "ch2-early-nd5-block", "ch2-early-main-qd3", "ch2-razuvaev-intro", "ch2-razuvaev-start", "ch2-razuvaev-worse-block", "ch2-razuvaev-finish", "ch2-early-e4-note", "ch2-main-eight", "ch2-d06-block", "ch2-branching-point", "ch2-nxd4-page25"];
+  let priorPage25Index = -1;
+  for (const id of expectedPage25Order) {
+    const index = page25Ids.indexOf(id);
+    assert.ok(index > priorPage25Index, `${id} must preserve printed page 25 reading order`);
+    priorPage25Index = index;
+  }
+  const page25Text = page25Blocks.filter((block) => "text" in block).map((block) => block.text).join(" ");
+  for (const anchor of ["6...Bc6", "8.Nc3 Nd5 9.Qd3", "Chess Informant 57", "11.e4 is another strong possibility", "Razuvaev - Klovans, Bern 1993", "first branching point", "only occurred twice in practice"]) assert.match(page25Text, new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  for (const diagramId of ["CH2-D05", "CH2-D06"]) assert.equal(page25Blocks.filter((block) => block.diagramId === diagramId).length, 1, `${diagramId} must render once on page 25`);
+  const c1Main = CHAPTER2_LESSON.lines.find((line) => line.id === "ch2-c1-main");
+  assert.equal(c1Main.moves[7].san, "Rd1", "the Chapter 2 source has 13.Rd1, not 13.Ra5");
+  assert.equal(c1Main.moves[15].san, "Bxd5", "the Chapter 2 source has 17.Bxd5");
+  const correctedDiagrams = new Map(CHAPTER2_LESSON.diagrams.filter((diagram) => /^CH2-D(?:1[89]|2[0-4])$/.test(diagram.id)).map((diagram) => [diagram.id, [diagram.lineId, diagram.moveIndex]]));
+  assert.deepEqual(Object.fromEntries(correctedDiagrams), {
+    "CH2-D18": ["ch2-c1-main", 6], "CH2-D19": ["ch2-c1-main", 10], "CH2-D20": ["ch2-c2-main", 0], "CH2-D21": ["ch2-c2-h5", 12], "CH2-D22": ["ch2-c2-main", 7], "CH2-D23": ["ch2-c2-critical", 7], "CH2-D24": ["ch2-c2-main", 16],
+  });
   for (const heading of ["A) 8...Be7", "B) 8...Nd5!?", "C) 8...Qd7", "C1) 9...Rb8", "C2) 9...O-O-O", "Conclusion"]) assert.match(CHAPTER2_LESSON.blocks.map((block) => "text" in block ? block.text : "").join("\n"), new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   const spanOrder = new Map(CHAPTER2_LESSON.sourceSpans.map((span) => [span.id, span.order]));
   const blockOrders = CHAPTER2_LESSON.blocks.map((block) => spanOrder.get(block.sourceSpanId));
@@ -76,12 +164,17 @@ test("packages Chapter 2 in verified source order with all 25 diagrams", async (
   };
   for (const [spanId, anchor] of Object.entries(pageAnchors)) assert.match(textBySpan.get(spanId), new RegExp(anchor, "i"), `${spanId} is missing ${anchor}`);
   for (const block of CHAPTER2_LESSON.blocks) {
+    if ("text" in block && /(?:^|\s)\d+\.(?:\.\.)?\s*(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8])/.test(block.text)) assert.ok(block.moveRefs?.length, `${block.id}: numbered chess notation must be linked`);
     if (!("moveRefs" in block) || !block.moveRefs) continue;
+    let cursor = 0;
     for (const reference of block.moveRefs) {
       const line = CHAPTER2_LESSON.lines.find((candidate) => candidate.id === reference.lineId);
       assert.ok(line, `${block.id}: missing line ${reference.lineId}`);
       assert.ok(line.moves[reference.moveIndex], `${block.id}: invalid move index ${reference.moveIndex}`);
       assert.ok(block.text.includes(reference.source), `${block.id}: source token ${reference.source} is not present in its text`);
+      const index = block.text.indexOf(reference.source, cursor);
+      assert.ok(index >= cursor, `${block.id}: source token ${reference.source} cannot render in reference order`);
+      cursor = index + reference.source.length;
     }
   }
   await Promise.all(Array.from({ length: 10 }, (_, index) => access(new URL(`public/source/chapter2/pages/printed-${String(index + 24).padStart(2, "0")}.png`, root))));
@@ -308,7 +401,7 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   await Promise.all(pieces.map((piece) => access(new URL(`public/assets/pieces/mpchess/${piece}.svg`, root))));
   await Promise.all(["B2-D01.png", "B2-D02.png", "B2-D03.png", "b2-heading-and-first-move.png", "b2-right-column.png", "b2-page14-left.png"].map((file) => access(new URL(`public/source/crops/${file}`, root))));
   await Promise.all(Array.from({ length: 25 }, (_, index) => access(new URL(`public/source/crops/c/C-D${String(index + 1).padStart(2, "0")}.png`, root))));
-  const [app, config, client, css, launcher, vinextPatch] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), readFile(new URL("app/chapter-config.ts", root), "utf8"), readFile(new URL("app/stockfish-client.ts", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8"), readFile(new URL("scripts/patch-vinext-static.mjs", root), "utf8")]);
+  const [app, config, client, css, launcher, vinextPatch] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), Promise.all([readFile(new URL("app/chapter-config.ts", root), "utf8"), readFile(new URL("app/chapter-packages/chapter-1.ts", root), "utf8")]).then((parts) => parts.join("\n")), readFile(new URL("app/stockfish-client.ts", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8"), readFile(new URL("scripts/patch-vinext-static.mjs", root), "utf8")]);
   assert.match(css, /\.board\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*1fr\)[^}]*grid-template-rows:\s*repeat\(8,\s*1fr\)/s);
   assert.match(css, /\.board-analysis-row\s*\{[^}]*display:\s*flex[^}]*align-items:\s*stretch/s);
   assert.match(css, /\.evaluation-rail\s*\{[^}]*flex:\s*0 0 16px/s);
@@ -320,6 +413,11 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   assert.match(css, /@media\s*\(min-width:\s*1051px\)[\s\S]*?\.guided-layout\s*\{[^}]*gap:\s*clamp\(24px,\s*3vw,\s*48px\)/s);
   assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.guided-layout\s*\{[^}]*grid-template-columns:[^}]*minmax\(0,\s*1fr\)[^}]*align-items:\s*stretch/s);
   assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.narrative\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.topbar\s*\{[^}]*left:\s*calc\(24px \+ var\(--landscape-board-column\)\)/s, "mobile-landscape header should begin at the right reading column");
+  assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.content\s*\{[^}]*height:\s*100dvh[^}]*padding:\s*0/s, "the board column should use the full landscape viewport height");
+  assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.lesson-reader\s*\{[^}]*height:\s*100dvh/s);
+  assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.narrative\s*\{[^}]*padding:\s*calc\(var\(--topbar\) \+ 8px\)/s, "right-side reading content should clear its header");
+  assert.match(app, /data-chapter-id=\{chapter\.id\}/, "landscape chapter controls should remain compact as chapters are added");
   assert.match(css, /\.square img\s*\{[^}]*transform:\s*scale\(var\(--piece-scale,\s*1\)\)[^}]*transform-origin:\s*50% 88%/s);
   assert.match(css, /img\[data-color="b"\]\[data-piece="r"\]\s*\{[^}]*--piece-scale:\s*1\.15/s);
   assert.match(css, /img\[data-color="w"\]\[data-piece="p"\]\s*\{[^}]*--piece-scale:\s*1\.15/s);

@@ -10,7 +10,14 @@
     "build": "vinext build",
     "start": "vinext start",
     "postinstall": "node scripts/patch-vinext-static.mjs",
-    "test": "npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs",
+    "chapters:sync": "node scripts/chapter-system.mjs sync",
+    "chapters:check": "node scripts/chapter-system.mjs check",
+    "chapters:inspect": "node scripts/chapter-system.mjs inspect",
+    "chapters:prepare": "node scripts/chapter-system.mjs prepare",
+    "chapters:crops": "python scripts/extract_chessboard_crops.py",
+    "chapters:validate-lesson": "node scripts/validate-chapter-lesson.mjs",
+    "chapters:verify-import": "node scripts/verify-chapter-import.mjs",
+    "test": "npm run chapters:check && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
