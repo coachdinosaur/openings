@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import CatalanApp from "../../../CatalanApp";
-import { isChapterId } from "../../../chapter-config";
+import { isChapterId } from "../../../chapter-routing.generated";
 
 export default async function ChapterImportPage({ params }: { params: Promise<{ chapterId: string }> }) {
   const { chapterId } = await params;
   if (!isChapterId(chapterId)) notFound();
+  const { default: CatalanApp } = await import("../../../CatalanApp");
   return <CatalanApp chapterId={chapterId} initialView="import" />;
 }

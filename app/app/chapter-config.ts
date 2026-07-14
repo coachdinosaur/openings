@@ -1,10 +1,11 @@
 import { CHAPTER_CONFIGS } from "./chapter-registry.generated";
 import type { ChapterConfig } from "./chapter-definition";
 import { assertChapterCatalog } from "./chapter-validation";
+import type { ChapterId } from "./chapter-routing.generated";
 
 export type { ChapterConfig, ChapterSection, ImportRegionSpec } from "./chapter-definition";
-
-export type ChapterId = keyof typeof CHAPTER_CONFIGS;
+export type { ChapterId } from "./chapter-routing.generated";
+export { isChapterId } from "./chapter-routing.generated";
 
 export const CHAPTERS: ChapterConfig[] = Object.values(CHAPTER_CONFIGS).sort(
   (left, right) => Number(left.id) - Number(right.id),
@@ -16,10 +17,6 @@ export const CHAPTERS: ChapterConfig[] = Object.values(CHAPTER_CONFIGS).sort(
 // development and tests only.
 if (process.env.NODE_ENV !== "production") {
   assertChapterCatalog(CHAPTERS);
-}
-
-export function isChapterId(id: string): id is ChapterId {
-  return Object.prototype.hasOwnProperty.call(CHAPTER_CONFIGS, id);
 }
 
 export function chapterConfig(id: ChapterId): ChapterConfig {

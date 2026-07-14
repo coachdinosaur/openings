@@ -1,5 +1,4 @@
-import CatalanApp from "./CatalanApp.tsx";
-
-export default function Home() {
+export default async function Home() {
+  const { default: CatalanApp } = await import("./CatalanApp");
   return <CatalanApp />;
 }
