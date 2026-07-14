@@ -99,17 +99,20 @@ export type ReviewItem = {
 };
 
 export type ReviewOverlay = {
-  schemaVersion: 2;
-  fixtureSha256: string;
+  schemaVersion: 3;
+  sourceSha256: string;
+  lessonSha256: string;
   items: Record<string, ReviewItem>;
+  orphanedItems?: Record<string, ReviewItem>;
   legacyTextReview?: { transcription: string; decision: string };
 };
 
-export type ImportComparison = {
-  status: "no_change" | "review_required" | "rejected";
+export type SourceVerificationResult = {
+  status: "verified" | "review_required" | "rejected";
+  scope: "canonical_snapshot" | "uploaded_pdf";
   sourceHash: string;
   canonicalLessonHash: string;
-  changedLessonEntities: number;
+  checksPassed: number;
   preservedCorrections: number;
   extractedRegionCount: number;
   message: string;

@@ -4,10 +4,10 @@ import { ChangeEvent, memo, MouseEvent, ReactNode, RefObject, useCallback, useEf
 import { Chess, Square } from "chess.js";
 import { useRouter } from "next/navigation";
 import { B2_LESSON } from "./b2-lesson";
-import { CHAPTERS, chapterConfig, type ChapterConfig, type ChapterId } from "./chapter-config";
+import type { ChapterConfig, ChapterSummary } from "./chapter-definition";
 import { canonicalize, sha256 } from "./canonical";
 import LessonLoading from "./LessonLoading";
-import type { DiagramLink, ImportComparison, LessonDocument, MoveReference, ReviewItem, ReviewOverlay, VariationMove, VariationNode } from "./lesson-model";
+import type { DiagramLink, LessonDocument, MoveReference, ReviewItem, ReviewOverlay, SourceVerificationResult, VariationMove, VariationNode } from "./lesson-model";
 import { legalTargets, playAnalysisMove } from "./board-analysis";
 import type { AnalysisMove, BoardMoveInput, PromotionPiece } from "./board-analysis";
 import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishClient, StockfishEvent } from "./stockfish-client";
@@ -27,7 +27,12 @@ const lessonPathCaches = new WeakMap<LessonDocument, Map<string, VariationMove[]
 type ResolvedPosition = { fen: string; path: VariationMove[]; valid: boolean; activeMove: VariationMove | undefined };
 const positionCaches = new WeakMap<ReviewOverlay, WeakMap<LessonDocument, Map<string, ResolvedPosition>>>();
 
-const emptyOverlay = (lesson: LessonDocument): ReviewOverlay => ({ schemaVersion: 2, fixtureSha256: lesson.source.sha256, items: {} });
+const emptyOverlay = (config: ChapterConfig): ReviewOverlay => ({
+  schemaVersion: 3,
+  sourceSha256: config.lesson.source.sha256,
+  lessonSha256: config.importDefinition.expectedCanonicalHash ?? "legacy",
+  items: {},
+});
 const lineById = (lesson: LessonDocument, id: string) => {
   let index = lessonLineIndexes.get(lesson);
   if (!index) {
@@ -128,14 +133,27 @@ function scoreToWhiteFraction(score: EngineScore | null): number | null {
 }
 
 function migrateReview(config: ChapterConfig): ReviewOverlay {
+  const validIds = new Set([
+    ...config.lesson.blocks.map((block) => block.id),
+    ...config.lesson.diagrams.map((diagram) => diagram.id),
+    ...config.lesson.lines.flatMap((line) => line.moves.map((move) => move.id)),
+  ]);
   const stored = localStorage.getItem(config.reviewKey);
   if (stored) {
     try {
-      const parsed = JSON.parse(stored) as ReviewOverlay;
-      if (parsed.schemaVersion === 2 && parsed.fixtureSha256 === config.lesson.source.sha256) return parsed;
+      const parsed = JSON.parse(stored) as ReviewOverlay | { schemaVersion: 2; fixtureSha256: string; items: Record<string, ReviewItem>; legacyTextReview?: ReviewOverlay["legacyTextReview"] };
+      if (parsed.schemaVersion === 3 && parsed.sourceSha256 === config.lesson.source.sha256 && parsed.lessonSha256 === (config.importDefinition.expectedCanonicalHash ?? "legacy")) return parsed;
+      if (parsed.schemaVersion === 2 && parsed.fixtureSha256 === config.lesson.source.sha256) {
+        const next = emptyOverlay(config);
+        next.items = Object.fromEntries(Object.entries(parsed.items).filter(([id]) => validIds.has(id)));
+        next.orphanedItems = Object.fromEntries(Object.entries(parsed.items).filter(([id]) => !validIds.has(id)));
+        next.legacyTextReview = parsed.legacyTextReview;
+        localStorage.setItem(config.reviewKey, JSON.stringify(next));
+        return next;
+      }
     } catch {}
   }
-  const next = emptyOverlay(config.lesson);
+  const next = emptyOverlay(config);
   if (config.id !== "1") return next;
   const legacy = localStorage.getItem(LEGACY_REVIEW_KEY);
   if (!legacy) return next;
@@ -620,16 +638,16 @@ function ReviewView({ config, overlay, setOverlay }: { config: ChapterConfig; ov
 function ImportView({ config, overlay }: { config: ChapterConfig; overlay: ReviewOverlay }) {
   const { lesson } = config;
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<ImportComparison | null>(null);
+  const [result, setResult] = useState<SourceVerificationResult | null>(null);
   const preservedCorrections = Object.values(overlay.items).filter((item) => item.decision === "accepted").length;
-  const compareLesson = async (sourceHash: string, extractedRegionCount: number): Promise<ImportComparison> => {
+  const compareLesson = async (sourceHash: string, extractedRegionCount: number, scope: SourceVerificationResult["scope"]): Promise<SourceVerificationResult> => {
     const canonicalLessonHash = await sha256(canonicalize(lesson));
     const matches = !config.importDefinition.expectedCanonicalHash || canonicalLessonHash === config.importDefinition.expectedCanonicalHash;
-    return { status: matches ? "no_change" : "review_required", sourceHash, canonicalLessonHash, changedLessonEntities: matches ? 0 : 1, preservedCorrections, extractedRegionCount, message: matches ? "The packaged lesson rebuilt identically. Manual corrections remain separate and preserved." : "The rebuilt canonical lesson differs from the packaged expected snapshot. Nothing was overwritten." };
+    return { status: matches ? "verified" : "review_required", scope, sourceHash, canonicalLessonHash, checksPassed: matches ? (scope === "uploaded_pdf" ? 3 : 1) : 0, preservedCorrections, extractedRegionCount, message: matches ? (scope === "uploaded_pdf" ? "The PDF hash, declared source regions, and packaged lesson snapshot are verified. Review corrections remain separate and preserved." : "The packaged canonical lesson snapshot matches its verified baseline. No PDF was read during this check.") : "The packaged canonical lesson differs from its verified baseline. Nothing was overwritten." };
   };
   const runBundled = async () => {
     setRunning(true); setResult(null);
-    try { setResult(await compareLesson(lesson.source.sha256, config.importDefinition.regions.length)); }
+    try { setResult(await compareLesson(lesson.source.sha256, 0, "canonical_snapshot")); }
     finally { setRunning(false); }
   };
   const checkPdf = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -639,28 +657,27 @@ function ImportView({ config, overlay }: { config: ChapterConfig; overlay: Revie
       const bytes = await file.arrayBuffer();
       const sourceHash = await sha256(bytes);
       if (sourceHash !== lesson.source.sha256) {
-        setResult({ status: "rejected", sourceHash, canonicalLessonHash: "not generated", changedLessonEntities: 0, preservedCorrections, extractedRegionCount: 0, message: `This PDF does not match the verified ${config.importDefinition.filename}. No lesson or review data was changed.` });
+        setResult({ status: "rejected", scope: "uploaded_pdf", sourceHash, canonicalLessonHash: "not generated", checksPassed: 0, preservedCorrections, extractedRegionCount: 0, message: `This PDF does not match the verified ${config.importDefinition.filename}. No lesson or review data was changed.` });
       } else {
         const { extractLessonRegions } = await import("./pdf-import");
         const regions = await extractLessonRegions(bytes, lesson, config.importDefinition.regions);
-        setResult(await compareLesson(sourceHash, regions.length));
+        setResult(await compareLesson(sourceHash, regions.length, "uploaded_pdf"));
       }
     } catch (error) {
-      setResult({ status: "review_required", sourceHash: lesson.source.sha256, canonicalLessonHash: "not generated", changedLessonEntities: 0, preservedCorrections, extractedRegionCount: 0, message: error instanceof Error ? error.message : "The PDF regions could not be extracted. Nothing was overwritten." });
+      setResult({ status: "review_required", scope: "uploaded_pdf", sourceHash: lesson.source.sha256, canonicalLessonHash: "not generated", checksPassed: 0, preservedCorrections, extractedRegionCount: 0, message: error instanceof Error ? error.message : "The PDF regions could not be extracted. Nothing was overwritten." });
     } finally { setRunning(false); event.target.value = ""; }
   };
-  return <main className="view editor-view"><section className="page-heading"><div><p className="eyebrow">Editor mode · deterministic rebuild</p><h1>Re-import {config.label}</h1><p className="lede">Rebuild the declared source regions, compare the canonical lesson snapshot, and preserve the local review overlay.</p></div></section><section className="import-card"><div className="import-mark">↧</div><h2>Rebuild packaged lesson snapshot</h2><p>Checks the {config.importDefinition.scopeLabel}, compares the reviewed baseline, and never overwrites corrections.</p><button className="primary-button" onClick={runBundled} disabled={running}>{running ? "Rebuilding..." : "Run zero-change demonstration"}</button><div className="or"><span>or</span></div><label className="file-button">Choose {config.importDefinition.filename}<input type="file" accept="application/pdf" onChange={checkPdf} /></label></section>{result && <section className={`import-result ${result.status}`}><div className="result-icon">{result.status === "no_change" ? "✓" : "!"}</div><div><p className="eyebrow">Import result</p><h2>{result.status}</h2><p>{result.message}</p><dl><div><dt>Extracted regions</dt><dd>{result.extractedRegionCount}</dd></div><div><dt>Changed lesson entities</dt><dd>{result.changedLessonEntities}</dd></div><div><dt>Corrections preserved</dt><dd>{result.preservedCorrections}</dd></div><div><dt>Canonical lesson hash</dt><dd>{result.canonicalLessonHash}</dd></div></dl></div></section>}</main>;
+  return <main className="view editor-view"><section className="page-heading"><div><p className="eyebrow">Editor mode · source verification</p><h1>Verify {config.label}</h1><p className="lede">Verify the packaged canonical snapshot or inspect the exact source PDF without generating or overwriting lesson content.</p></div></section><section className="import-card"><div className="import-mark">↧</div><h2>Verify packaged lesson snapshot</h2><p>Checks the canonical lesson hash. The authoritative PDF check uses the {config.importDefinition.scopeLabel} below.</p><button className="primary-button" onClick={runBundled} disabled={running}>{running ? "Verifying..." : "Verify canonical snapshot"}</button><div className="or"><span>or</span></div><label className="file-button">Verify {config.importDefinition.filename}<input type="file" accept="application/pdf" onChange={checkPdf} /></label></section>{result && <section className={`import-result ${result.status}`}><div className="result-icon">{result.status === "verified" ? "✓" : "!"}</div><div><p className="eyebrow">Verification result</p><h2>{result.status}</h2><p>{result.message}</p><dl><div><dt>Verification scope</dt><dd>{result.scope}</dd></div><div><dt>Checks passed</dt><dd>{result.checksPassed}</dd></div><div><dt>Extracted regions</dt><dd>{result.extractedRegionCount}</dd></div><div><dt>Corrections preserved</dt><dd>{result.preservedCorrections}</dd></div><div><dt>Canonical lesson hash</dt><dd>{result.canonicalLessonHash}</dd></div></dl></div></section>}</main>;
 }
 
-export default function CatalanApp({ chapterId = "1", initialView = "lesson" }: { chapterId?: ChapterId; initialView?: View }) {
-  const config = chapterConfig(chapterId);
+export default function CatalanApp({ config, chapters, initialView = "lesson" }: { config: ChapterConfig; chapters: readonly ChapterSummary[]; initialView?: View }) {
   const router = useRouter();
   const [view, setView] = useState<View>(initialView);
-  const [overlay, setOverlayState] = useState<ReviewOverlay>(emptyOverlay(config.lesson));
+  const [overlay, setOverlayState] = useState<ReviewOverlay>(emptyOverlay(config));
   const [editorMode, setEditorMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [chapterTarget, setChapterTarget] = useState<ChapterConfig>();
+  const [chapterTarget, setChapterTarget] = useState<ChapterSummary>();
   const [, startChapterTransition] = useTransition();
   useEffect(() => {
     const hydrationTask = window.setTimeout(() => {
@@ -672,7 +689,7 @@ export default function CatalanApp({ chapterId = "1", initialView = "lesson" }: 
   const setOverlay = (value: ReviewOverlay) => { setOverlayState(value); localStorage.setItem(config.reviewKey, JSON.stringify(value)); };
   const toggleEditor = () => { const next = !editorMode; setEditorMode(next); localStorage.setItem(EDITOR_KEY, String(next)); if (!next) setView("lesson"); };
   const navigate = (next: View) => { setView(next); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const navigateChapter = (event: MouseEvent<HTMLAnchorElement>, chapter: ChapterConfig) => {
+  const navigateChapter = (event: MouseEvent<HTMLAnchorElement>, chapter: ChapterSummary) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || chapter.id === config.id) return;
     event.preventDefault();
     setMenuOpen(false);
@@ -681,9 +698,8 @@ export default function CatalanApp({ chapterId = "1", initialView = "lesson" }: 
   };
   return <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
     <header className="topbar"><button className="sidebar-toggle desktop-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Show navigation" : "Hide navigation"} aria-expanded={!sidebarCollapsed} aria-controls="course-sidebar">☰</button><button className="sidebar-toggle menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="course-sidebar">☰</button><button className="brand" onClick={() => navigate("lesson")}><span className="brand-mark">C</span><span><strong>Catalan Atelier</strong><small>{config.label}</small></span></button></header>
-    <aside id="course-sidebar" className={`sidebar ${menuOpen ? "open" : ""}`}><nav><p>Course</p>{CHAPTERS.map((chapter) => <a className={`course-link ${chapter.id === config.id ? "active" : ""}`} href={`/chapters/${chapter.id}`} onClick={(event) => navigateChapter(event, chapter)} key={chapter.id}><span className="nav-glyph">{chapter.id}</span><span>{chapter.label}</span></a>)}{editorMode && <><p className="editor-nav-label">Editor tools</p><a className={view === "review" ? "active" : ""} href={`/chapters/${config.id}/review`}><span className="nav-glyph">R</span><span>Source review</span></a><a className={view === "import" ? "active" : ""} href={`/chapters/${config.id}/import`}><span className="nav-glyph">I</span><span>Re-import</span></a></>}</nav><div className="sidebar-footer"><div className="source-card"><span>Verified source</span><strong>{config.importDefinition.filename}</strong><small>SHA-256 · {config.importDefinition.sourceHash.slice(0, 4)}...{config.importDefinition.sourceHash.slice(-4)}</small></div><button className={`editor-toggle ${editorMode ? "on" : ""}`} onClick={toggleEditor} role="switch" aria-checked={editorMode}><span className="toggle-track"><i /></span><strong>Editor mode</strong></button></div></aside>
+    <aside id="course-sidebar" className={`sidebar ${menuOpen ? "open" : ""}`}><nav><p>Course</p>{chapters.map((chapter) => <a className={`course-link ${chapter.id === config.id ? "active" : ""}`} href={`/chapters/${chapter.id}`} onClick={(event) => navigateChapter(event, chapter)} key={chapter.id}><span className="nav-glyph">{chapter.id}</span><span>{chapter.label}</span></a>)}{editorMode && <><p className="editor-nav-label">Editor tools</p><a className={view === "review" ? "active" : ""} href={`/chapters/${config.id}/review`}><span className="nav-glyph">R</span><span>Source review</span></a><a className={view === "import" ? "active" : ""} href={`/chapters/${config.id}/import`}><span className="nav-glyph">V</span><span>Verify source</span></a></>}</nav><div className="sidebar-footer"><div className="source-card"><span>Verified source</span><strong>{config.importDefinition.filename}</strong><small>SHA-256 · {config.importDefinition.sourceHash.slice(0, 4)}...{config.importDefinition.sourceHash.slice(-4)}</small></div><button className={`editor-toggle ${editorMode ? "on" : ""}`} onClick={toggleEditor} role="switch" aria-checked={editorMode}><span className="toggle-track"><i /></span><strong>Editor mode</strong></button></div></aside>
     {menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
-    <div className="chapter-switcher" aria-label="Chapters">{CHAPTERS.map((chapter) => <a className={config.id === chapter.id ? "active" : ""} data-chapter-id={chapter.id} href={`/chapters/${chapter.id}`} onClick={(event) => navigateChapter(event, chapter)} key={chapter.id}>{chapter.label}</a>)}</div>
     <div className="content">{view === "lesson" ? <LessonView config={config} overlay={overlay} /> : view === "review" && editorMode ? <ReviewView config={config} overlay={overlay} setOverlay={setOverlay} /> : view === "import" && editorMode ? <ImportView config={config} overlay={overlay} /> : <LessonView config={config} overlay={overlay} />}</div>
     {chapterTarget && chapterTarget.id !== config.id && <LessonLoading label={`Loading ${chapterTarget.label}…`} overlay />}
   </div>;

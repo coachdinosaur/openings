@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 import { Chess } from "chess.js";
@@ -28,6 +28,20 @@ async function loadChapter3() {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
+async function loadChapter4() {
+  const source = await readFile(new URL("app/chapter4-lesson.ts", root), "utf8");
+  let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  output = output.replace(/from ["']chess\.js["']/, `from ${JSON.stringify(import.meta.resolve("chess.js"))}`);
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
+async function loadChapter5() {
+  const source = await readFile(new URL("app/chapter5-lesson.ts", root), "utf8");
+  let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  output = output.replace(/from ["']chess\.js["']/, `from ${JSON.stringify(import.meta.resolve("chess.js"))}`);
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
 async function loadBoardAnalysis() {
   const source = await readFile(new URL("app/board-analysis.ts", root), "utf8");
   let output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -38,7 +52,7 @@ async function loadBoardAnalysis() {
 function canonicalize(value) {
   const excluded = new Set(["timestamp", "generatedId", "absolutePath", "importRunId", "machineName", "userName", "temporaryPath"]);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.entries(value).filter(([key]) => !excluded.has(key)).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalize(item)}`).join(",")}}`;
+  if (value && typeof value === "object") return `{${Object.entries(value).filter(([key, item]) => !excluded.has(key) && item !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalize(item)}`).join(",")}}`;
   return JSON.stringify(value);
 }
 
@@ -60,23 +74,111 @@ async function render(path = "/") {
 }
 
 test("publishes only registered packages through shared chapter routes", async () => {
-  const [registry, app, chapter3, unpublished] = await Promise.all([
-    readFile(new URL("app/chapter-registry.generated.ts", root), "utf8"),
+  const publishedIds = (await readdir(new URL("app/chapter-packages/", root)))
+    .map((name) => /^chapter-(\d+)\.ts$/.exec(name)?.[1])
+    .filter(Boolean)
+    .sort((left, right) => Number(left) - Number(right));
+  const [catalog, app, publishedResponses, unpublished] = await Promise.all([
+    readFile(new URL("app/chapter-catalog.generated.ts", root), "utf8"),
     readFile(new URL("app/CatalanApp.tsx", root), "utf8"),
-    render("/chapters/3"),
-    render("/chapters/4"),
+    Promise.all(publishedIds.map((id) => render(`/chapters/${id}`))),
+    render(`/chapters/${Number(publishedIds.at(-1)) + 1}`),
   ]);
-  assert.match(registry, /"1": CHAPTER_1_CONFIG/);
-  assert.match(registry, /"2": CHAPTER_2_CONFIG/);
-  assert.match(registry, /"3": CHAPTER_3_CONFIG/);
-  assert.match(app, /CHAPTERS\.map/);
-  assert.equal(chapter3.status, 200, "the verified Chapter 3 package should publish automatically");
+  assert.match(catalog, new RegExp(`CHAPTER_IDS = \\[${publishedIds.map((id) => `"${id}"`).join(", ")}\\]`));
+  for (const id of publishedIds) {
+    assert.match(catalog, new RegExp(`"${id}": \\(\\) => import\\("\\./chapter-packages/chapter-${id}"\\)`));
+  }
+  assert.match(app, /chapters\.map/);
+  assert.ok(publishedResponses.every((response) => response.status === 200), "every verified package should publish automatically");
   assert.equal(unpublished.status, 404, "an unregistered chapter must remain unpublished");
   await Promise.all([
     access(new URL("app/chapters/[chapterId]/page.tsx", root)),
     access(new URL("app/chapters/[chapterId]/review/page.tsx", root)),
     access(new URL("app/chapters/[chapterId]/import/page.tsx", root)),
   ]);
+});
+
+test("keeps complete lesson payloads out of the shared client application chunk", async () => {
+  const assets = new URL("dist/client/assets/", root);
+  const chunkName = (await readdir(assets)).find((name) => /^CatalanApp-.*\.js$/.test(name));
+  assert.ok(chunkName, "the shared CatalanApp client chunk should exist");
+  const source = await readFile(new URL(chunkName, assets), "utf8");
+  assert.ok(source.length < 60_000, `expected the shared app chunk below 60 KB, received ${source.length}`);
+  for (const marker of ["chapter2-p24-full", "chapter3-p34-full", "chapter4-p51-full", "chapter5-p63-full"]) assert.doesNotMatch(source, new RegExp(marker));
+});
+
+test("packages Chapter 5 in verified source order with all 32 diagrams", async () => {
+  const { CHAPTER5_LESSON } = await loadChapter5();
+  assert.equal(CHAPTER5_LESSON.source.filename, "Chapter5_Catalan.pdf");
+  assert.equal(CHAPTER5_LESSON.source.sha256, "65E6648ABF3E70594FD462107DA0A6A967DE18916FACC0284A15F3D1919B1F5F");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER5_LESSON)).digest("hex").toUpperCase(), "0663EB1DE471A77D57DF6B65F0E7DA7D41CC9BD8AA61D0DBC34FCADB1D0A5013");
+  assert.equal(CHAPTER5_LESSON.sourceSpans.length, 19);
+  assert.equal(CHAPTER5_LESSON.diagrams.length, 32);
+  assert.ok(CHAPTER5_LESSON.lines.length >= 35);
+  assert.ok(CHAPTER5_LESSON.blocks.length >= 70);
+  const linkedMoves = CHAPTER5_LESSON.blocks.reduce((total, block) => total + (block.moveRefs?.length ?? 0), 0);
+  assert.ok(linkedMoves >= 150, `expected Chapter 5 notation to be interactive, received ${linkedMoves} move links`);
+  assert.deepEqual([...new Set(CHAPTER5_LESSON.blocks.map((block) => block.sourceSpanId))], CHAPTER5_LESSON.sourceSpans.map((span) => span.id));
+  const spanOrder = new Map(CHAPTER5_LESSON.sourceSpans.map((span) => [span.id, span.order]));
+  const blockOrders = CHAPTER5_LESSON.blocks.map((block) => spanOrder.get(block.sourceSpanId));
+  assert.ok(blockOrders.every((order, index) => index === 0 || order >= blockOrders[index - 1]));
+  await Promise.all(Array.from({ length: 10 }, (_, index) => access(new URL(`public/source/chapter5/pages/printed-${index + 63}.png`, root))));
+  await Promise.all(Array.from({ length: 32 }, (_, index) => access(new URL(`public/source/chapter5/crops/CH5-D${String(index + 1).padStart(2, "0")}.png`, root))));
+  for (const line of CHAPTER5_LESSON.lines) {
+    const board = new Chess(line.startFen ?? CHAPTER5_LESSON.basePosition.fen);
+    for (const move of line.moves) assert.doesNotThrow(() => board.move(move.san), `${line.id}: ${move.san}`);
+  }
+  for (const diagram of CHAPTER5_LESSON.diagrams) {
+    const line = CHAPTER5_LESSON.lines.find((candidate) => candidate.id === diagram.lineId);
+    assert.ok(line, diagram.id);
+    const board = new Chess(line.startFen);
+    line.moves.slice(0, diagram.moveIndex + 1).forEach((move) => board.move(move.san));
+    assert.equal(board.fen(), diagram.fen, diagram.id);
+  }
+  const responses = await Promise.all([render("/chapters/5"), render("/chapters/5/review"), render("/chapters/5/import")]);
+  for (const response of responses) assert.equal(response.status, 200);
+  const html = await responses[0].text();
+  assert.match(html, /Chapter 5 - Complete/);
+  assert.match(html, /Variation Index/);
+  assert.ok((html.match(/class="inline-move/g) ?? []).length >= 150, "Chapter 5 should render its move references as interactive buttons");
+  for (let index = 1; index <= 32; index += 1) assert.match(html, new RegExp(`CH5-D${String(index).padStart(2, "0")}`));
+});
+
+test("packages Chapter 4 in verified source order with all 33 diagrams", async () => {
+  const { CHAPTER4_LESSON } = await loadChapter4();
+  assert.equal(CHAPTER4_LESSON.source.filename, "Chapter4_Catalan.pdf");
+  assert.equal(CHAPTER4_LESSON.source.sha256, "81A467F058A1AB088F6548A81304450A1FEC00EEC9FC0CFE830E826B5CD22587");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER4_LESSON)).digest("hex").toUpperCase(), "3C2BB1178E583D92E126AF158BF2EFF40F0DB873F4F5E2F0320213284564A4CA");
+  assert.equal(CHAPTER4_LESSON.sourceSpans.length, 23);
+  assert.equal(CHAPTER4_LESSON.diagrams.length, 33);
+  assert.ok(CHAPTER4_LESSON.lines.length >= 25);
+  assert.ok(CHAPTER4_LESSON.blocks.length >= 75);
+  const linkedMoves = CHAPTER4_LESSON.blocks.reduce((total, block) => total + (block.moveRefs?.length ?? 0), 0);
+  assert.ok(linkedMoves >= 220, `expected Chapter 4 notation to be interactive, received ${linkedMoves} move links`);
+  assert.deepEqual([...new Set(CHAPTER4_LESSON.blocks.map((block) => block.sourceSpanId))], CHAPTER4_LESSON.sourceSpans.map((span) => span.id));
+  const spanOrder = new Map(CHAPTER4_LESSON.sourceSpans.map((span) => [span.id, span.order]));
+  const blockOrders = CHAPTER4_LESSON.blocks.map((block) => spanOrder.get(block.sourceSpanId));
+  assert.ok(blockOrders.every((order, index) => index === 0 || order >= blockOrders[index - 1]));
+  await Promise.all(Array.from({ length: 12 }, (_, index) => access(new URL(`public/source/chapter4/pages/printed-${index + 51}.png`, root))));
+  await Promise.all(Array.from({ length: 33 }, (_, index) => access(new URL(`public/source/chapter4/crops/CH4-D${String(index + 1).padStart(2, "0")}.png`, root))));
+  for (const line of CHAPTER4_LESSON.lines) {
+    const board = new Chess(line.startFen ?? CHAPTER4_LESSON.basePosition.fen);
+    for (const move of line.moves) assert.doesNotThrow(() => board.move(move.san), `${line.id}: ${move.san}`);
+  }
+  for (const diagram of CHAPTER4_LESSON.diagrams) {
+    const line = CHAPTER4_LESSON.lines.find((candidate) => candidate.id === diagram.lineId);
+    assert.ok(line, diagram.id);
+    const board = new Chess(line.startFen);
+    line.moves.slice(0, diagram.moveIndex + 1).forEach((move) => board.move(move.san));
+    assert.equal(board.fen(), diagram.fen, diagram.id);
+  }
+  const responses = await Promise.all([render("/chapters/4"), render("/chapters/4/review"), render("/chapters/4/import")]);
+  for (const response of responses) assert.equal(response.status, 200);
+  const html = await responses[0].text();
+  assert.match(html, /Chapter 4 - Complete/);
+  assert.match(html, /Variation Index/);
+  assert.ok((html.match(/class="inline-move/g) ?? []).length >= 220, "Chapter 4 should render its move references as interactive buttons");
+  for (let index = 1; index <= 33; index += 1) assert.match(html, new RegExp(`CH4-D${String(index).padStart(2, "0")}`));
 });
 
 test("shows the lesson loader during client-side chapter changes", async () => {
@@ -88,7 +190,7 @@ test("shows the lesson loader during client-side chapter changes", async () => {
   ]);
   assert.match(app, /CHAPTER_NAVIGATION_PAINT_DELAY_MS = 120/);
   assert.match(app, /setTimeout\(\(\) => startChapterTransition\(\(\) => router\.push\(`\/chapters\/\$\{chapter\.id\}`\)\), CHAPTER_NAVIGATION_PAINT_DELAY_MS\)/);
-  assert.equal((app.match(/onClick=\{\(event\) => navigateChapter\(event, chapter\)\}/g) ?? []).length, 2, "sidebar and compact chapter controls must both use transition navigation");
+  assert.equal((app.match(/onClick=\{\(event\) => navigateChapter\(event, chapter\)\}/g) ?? []).length, 1, "sidebar chapter controls must use transition navigation");
   assert.match(app, /chapterTarget && chapterTarget\.id !== config\.id && <LessonLoading/);
   assert.match(loading, /<LessonLoading \/>/);
   assert.match(sharedLoader, /chapter-loader-overlay/);
@@ -110,11 +212,33 @@ test("collapses the desktop sidebar and releases its full content width", async 
   assert.match(styles, /\.content\s*\{[^}]*transition:\s*padding-left \.22s ease/s);
 });
 
+test("uses the Chapter 4 conclusion treatment in every published chapter", async () => {
+  const [chapter1Source, chapter1Response, { CHAPTER2_LESSON }, { CHAPTER3_LESSON }, { CHAPTER4_LESSON }, { CHAPTER5_LESSON }] = await Promise.all([
+    readFile(new URL("app/chapter1-c-section.ts", root), "utf8"),
+    render("/chapters/1"),
+    loadChapter2(),
+    loadChapter3(),
+    loadChapter4(),
+    loadChapter5(),
+  ]);
+  assert.match(chapter1Source, /id: "conclusion", type: "variation"[^\n]+title: "Conclusion"[^\n]+lineId: "c-conclusion-line-1"/);
+  assert.equal(chapter1Response.status, 200);
+  const chapter1Html = await chapter1Response.text();
+  const chapter1Conclusion = chapter1Html.match(/data-block-id="conclusion"[\s\S]{0,1000}/)?.[0] ?? "";
+  assert.match(chapter1Conclusion, /class="variation-card"/);
+  for (const lesson of [CHAPTER2_LESSON, CHAPTER3_LESSON, CHAPTER4_LESSON, CHAPTER5_LESSON]) {
+    const conclusion = lesson.blocks.find((block) => block.title === "Conclusion");
+    assert.ok(conclusion, `${lesson.chapterId}: conclusion card is missing`);
+    assert.equal(conclusion.type, "variation", `${lesson.chapterId}: conclusion must use the Chapter 4 card treatment`);
+    assert.ok(conclusion.lineId, `${lesson.chapterId}: conclusion card must keep an interactive line`);
+  }
+});
+
 test("packages Chapter 3 in verified source order with all 44 diagrams", async () => {
   const { CHAPTER3_LESSON } = await loadChapter3();
   assert.equal(CHAPTER3_LESSON.source.filename, "Chapter3_Catalan.pdf");
   assert.equal(CHAPTER3_LESSON.source.sha256, "35AD12F7AD89E7474BF434DBC34AB217E297BA20C8BB48BF2F25B45EF5F32E7A");
-  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER3_LESSON)).digest("hex").toUpperCase(), "037FE07522CE37C6633A23ED833B00A7FD9E4353FBC3386D5EFE9CF03C46D41A");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER3_LESSON)).digest("hex").toUpperCase(), "87683CDB1D5A2B7AB85A38E7D3173332B3A345D206694AF07FC39D26F2D67F7E");
   assert.equal(CHAPTER3_LESSON.sourceSpans.length, 33);
   assert.equal(CHAPTER3_LESSON.diagrams.length, 44);
   assert.ok(CHAPTER3_LESSON.lines.length >= 20);
@@ -155,7 +279,7 @@ test("packages Chapter 2 in verified source order with all 25 diagrams", async (
   const { CHAPTER2_LESSON } = await loadChapter2();
   assert.equal(CHAPTER2_LESSON.source.filename, "Chapter2_Catalan.pdf");
   assert.equal(CHAPTER2_LESSON.source.sha256, "8191475E0B1E5E3B65B1B39EFDA4DB03C87072A8A199B38254FE18E1DD8098C1");
-  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER2_LESSON)).digest("hex").toUpperCase(), "29884B4B2CBDDBE9AB730C169640EB2077ACB034DDD0FD75E0E2BE63637C7369");
+  assert.equal(crypto.createHash("sha256").update(canonicalize(CHAPTER2_LESSON)).digest("hex").toUpperCase(), "A47C6ABC60B17DD2FA11A4DAF425ECCCECC7F752142E83D45C54577294B68558");
   assert.deepEqual(CHAPTER2_LESSON.sourceSpans.slice(0, 5).map((span) => [span.printedPage, span.column, span.order]), [[24, "full", 1], [25, "left", 2], [25, "right", 3], [26, "left", 4], [26, "right", 5]]);
   assert.equal(CHAPTER2_LESSON.sourceSpans.length, 19);
   assert.equal(CHAPTER2_LESSON.diagrams.length, 25);
@@ -432,7 +556,7 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   await Promise.all(pieces.map((piece) => access(new URL(`public/assets/pieces/mpchess/${piece}.svg`, root))));
   await Promise.all(["B2-D01.png", "B2-D02.png", "B2-D03.png", "b2-heading-and-first-move.png", "b2-right-column.png", "b2-page14-left.png"].map((file) => access(new URL(`public/source/crops/${file}`, root))));
   await Promise.all(Array.from({ length: 25 }, (_, index) => access(new URL(`public/source/crops/c/C-D${String(index + 1).padStart(2, "0")}.png`, root))));
-  const [app, config, client, css, launcher, vinextPatch] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), Promise.all([readFile(new URL("app/chapter-config.ts", root), "utf8"), readFile(new URL("app/chapter-packages/chapter-1.ts", root), "utf8")]).then((parts) => parts.join("\n")), readFile(new URL("app/stockfish-client.ts", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8"), readFile(new URL("scripts/patch-vinext-static.mjs", root), "utf8")]);
+  const [app, config, client, css, launcher, vinextPatch] = await Promise.all([readFile(new URL("app/CatalanApp.tsx", root), "utf8"), Promise.all([readFile(new URL("app/chapter-config.ts", root), "utf8"), readFile(new URL("app/chapter-packages/chapter-1.ts", root), "utf8"), readFile(new URL("app/chapter-manifests/chapter-1.json", root), "utf8")]).then((parts) => parts.join("\n")), readFile(new URL("app/stockfish-client.ts", root), "utf8"), readFile(new URL("app/globals.css", root), "utf8"), readFile(new URL("../start-local.ps1", root), "utf8"), readFile(new URL("scripts/patch-vinext-static.mjs", root), "utf8")]);
   assert.match(css, /\.board\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*1fr\)[^}]*grid-template-rows:\s*repeat\(8,\s*1fr\)/s);
   assert.match(css, /\.board-analysis-row\s*\{[^}]*display:\s*flex[^}]*align-items:\s*stretch/s);
   assert.match(css, /\.evaluation-rail\s*\{[^}]*flex:\s*0 0 8px/s);
@@ -453,7 +577,7 @@ test("packages evidence, enforces 64 equal squares, and preserves local review m
   assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.content\s*\{[^}]*height:\s*100dvh[^}]*padding:\s*0/s, "the board column should use the full landscape viewport height");
   assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.lesson-reader\s*\{[^}]*height:\s*100dvh/s);
   assert.match(css, /@media\s*\(orientation:\s*landscape\)[\s\S]*?\.narrative\s*\{[^}]*padding:\s*calc\(var\(--topbar\) \+ 8px\)/s, "right-side reading content should clear its header");
-  assert.match(app, /data-chapter-id=\{chapter\.id\}/, "landscape chapter controls should remain compact as chapters are added");
+  assert.doesNotMatch(app, /chapter-switcher|data-chapter-id/, "chapter links should only appear in the course sidebar");
   assert.match(css, /\.square img\s*\{[^}]*transform:\s*scale\(var\(--piece-scale,\s*1\)\)[^}]*transform-origin:\s*50% 88%/s);
   assert.match(css, /img\[data-color="b"\]\[data-piece="r"\]\s*\{[^}]*--piece-scale:\s*1\.15/s);
   assert.match(css, /img\[data-color="w"\]\[data-piece="p"\]\s*\{[^}]*--piece-scale:\s*1\.15/s);

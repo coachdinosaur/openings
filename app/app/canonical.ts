@@ -4,7 +4,7 @@ export function canonicalize(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   if (value && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !EXCLUDED_KEYS.has(key))
+      .filter(([key, item]) => !EXCLUDED_KEYS.has(key) && item !== undefined)
       .sort(([left], [right]) => left.localeCompare(right));
     return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalize(item)}`).join(",")}}`;
   }
@@ -18,5 +18,3 @@ export async function sha256(data: string | ArrayBuffer): Promise<string> {
 }
 
 export const EXPECTED_B2_LESSON_HASH = "2B35452A27F6D6E413EDC5226D694D4986D8D2EDAC458CD5C2427A6EE0F6DFC0";
-export const EXPECTED_CHAPTER2_LESSON_HASH = "29884B4B2CBDDBE9AB730C169640EB2077ACB034DDD0FD75E0E2BE63637C7369";
-export const EXPECTED_CHAPTER3_LESSON_HASH = "037FE07522CE37C6633A23ED833B00A7FD9E4353FBC3386D5EFE9CF03C46D41A";

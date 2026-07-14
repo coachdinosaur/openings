@@ -18,8 +18,12 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
   const lineMap = new Map(lesson.lines.map((line) => [line.id, line]));
   const spanMap = new Map(lesson.sourceSpans.map((span) => [span.id, span]));
   const blockMap = new Map(lesson.blocks.map((block) => [block.id, block]));
+  const allMoves = lesson.lines.flatMap((line) => line.moves);
+  const moveMap = new Map(allMoves.map((move) => [move.id, move]));
 
   if (config.label !== prefix) errors.push(`label must be ${prefix}`);
+  if (config.manifest.id !== Number(config.id)) errors.push("manifest id does not match package id");
+  if (config.manifest.source.printedEnd - config.manifest.source.printedStart + 1 !== config.manifest.evidence.pageCount) errors.push("printed range does not match evidence page count");
   if (config.importDefinition.filename !== `Chapter${config.id}_Catalan.pdf`) errors.push("source filename does not match the chapter id");
   if (lesson.source.filename !== config.importDefinition.filename) errors.push("lesson and package source filenames differ");
   if (lesson.source.sha256 !== config.importDefinition.sourceHash) errors.push("lesson and package source hashes differ");
@@ -31,11 +35,23 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
   unique(lesson.lines.map((line) => line.id), "line", errors);
   unique(lesson.blocks.map((block) => block.id), "block", errors);
   unique(lesson.diagrams.map((diagram) => diagram.id), "diagram", errors);
-  unique(lesson.lines.flatMap((line) => line.moves.map((move) => move.id)), "move", errors);
+  unique(allMoves.map((move) => move.id), "move", errors);
+  unique(config.annotatedMoveIds, "annotated move", errors);
+  unique(config.sections.map((section) => section.id), "section", errors);
+  unique(config.importDefinition.regions.map((region) => region.id), "import region", errors);
+
+  config.annotatedMoveIds.forEach((id) => {
+    if (!moveMap.has(id)) errors.push(`annotated move ${id} does not exist`);
+  });
+  if (lesson.diagrams.length !== config.manifest.evidence.diagramCount) errors.push(`expected ${config.manifest.evidence.diagramCount} diagrams, found ${lesson.diagrams.length}`);
+  const pageCrops = new Set(lesson.sourceSpans.map((span) => span.crop));
+  if (!legacy && pageCrops.size !== config.manifest.evidence.pageCount) errors.push(`expected ${config.manifest.evidence.pageCount} page images, found ${pageCrops.size}`);
 
   lesson.sourceSpans.forEach((span, index) => {
     if (span.order !== index + 1) errors.push(`source span ${span.id} order must be ${index + 1}`);
     if (span.bbox.x1 <= span.bbox.x0 || span.bbox.bottom <= span.bbox.top) errors.push(`source span ${span.id} has an invalid bounding box`);
+    if (span.pageIndex < 0 || span.pageIndex >= config.manifest.source.pdfPageCount) errors.push(`source span ${span.id} is outside the PDF page count`);
+    if (span.printedPage < config.manifest.source.printedStart || span.printedPage > config.manifest.source.printedEnd) errors.push(`source span ${span.id} is outside the printed range`);
   });
 
   const prefixMoves = (line: VariationNode, stack = new Set<string>()): VariationMove[] => {
@@ -74,7 +90,7 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
     else if (span.order < lastBlockOrder) errors.push(`block ${block.id} breaks source reading order`);
     else lastBlockOrder = span.order;
     if (block.type === "variation" && !lineMap.has(block.lineId)) errors.push(`block ${block.id} references missing line ${block.lineId}`);
-    block.moveRefs?.forEach((reference) => {
+    ("moveRefs" in block ? block.moveRefs : undefined)?.forEach((reference) => {
       const line = lineMap.get(reference.lineId);
       if (!line?.moves[reference.moveIndex]) errors.push(`block ${block.id} has an invalid move reference`);
       if (!legacy && "text" in block && !block.text.includes(reference.source)) errors.push(`block ${block.id} does not contain source token ${reference.source}`);
@@ -90,7 +106,19 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
     if (diagram.lineId) {
       const line = lineMap.get(diagram.lineId);
       if (!line) errors.push(`diagram ${diagram.id} references missing line ${diagram.lineId}`);
-      else if (diagram.moveIndex === null || diagram.moveIndex < 0 || diagram.moveIndex >= line.moves.length) errors.push(`diagram ${diagram.id} has an invalid move index`);
+      else if (diagram.moveIndex === null || diagram.moveIndex < -1 || diagram.moveIndex >= line.moves.length || (diagram.moveIndex === -1 && !line.startFen)) errors.push(`diagram ${diagram.id} has an invalid move index`);
+      else if (!legacy) {
+        try {
+          const board = new Chess(line.startFen ?? lesson.basePosition.fen);
+          const moves = line.startFen
+            ? line.moves.slice(0, diagram.moveIndex + 1)
+            : [...prefixMoves(line), ...line.moves.slice(0, diagram.moveIndex + 1)];
+          moves.forEach((move) => board.move(move.san));
+          if (board.fen() !== diagram.fen) errors.push(`diagram ${diagram.id} FEN does not match its move path`);
+        } catch (error) {
+          errors.push(`diagram ${diagram.id} move path is invalid: ${error instanceof Error ? error.message : "unknown chess error"}`);
+        }
+      }
     }
   });
 
@@ -104,6 +132,11 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
     if (!spanMap.has(region.id)) errors.push(`import region ${region.id} has no source span`);
     if (!region.anchors.length || region.anchors.some((anchor) => !anchor.trim())) errors.push(`import region ${region.id} needs non-empty anchors`);
   });
+  if (!legacy) {
+    const spanIds = lesson.sourceSpans.map((span) => span.id);
+    const regionIds = config.importDefinition.regions.map((region) => region.id);
+    if (spanIds.length !== regionIds.length || spanIds.some((id, index) => regionIds[index] !== id)) errors.push("import regions must cover source spans in reading order");
+  }
   return errors;
 }
 

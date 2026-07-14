@@ -58,9 +58,6 @@ svg { width: 22px; height: 22px; }
 .source-card strong { margin: 8px 0 6px; font-size: 12px; word-break: break-word; }
 .source-card small { color: #a9bbb5; font-size: 10px; }
 .content { padding: var(--topbar) 0 0 var(--sidebar); min-height: 100vh; transition: padding-left .22s ease; }
-.chapter-switcher { position: fixed; z-index: 20; top: 88px; right: 28px; display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.9); box-shadow: 0 8px 24px rgba(31,48,40,.08); }
-.chapter-switcher a { padding: 6px 10px; border-radius: 999px; color: var(--forest-2); font-size: 11px; font-weight: 750; text-decoration: none; }
-.chapter-switcher a.active { color: white; background: var(--forest-2); }
 .view { max-width: 1250px; margin: 0 auto; padding: 48px clamp(26px, 4vw, 62px) 70px; }
 .eyebrow { margin-bottom: 10px; color: var(--forest-2); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .14em; }
 h1 { font-size: clamp(31px, 4vw, 48px); line-height: 1.06; margin-bottom: 14px; }
@@ -220,6 +217,7 @@ input.invalid { border-color: #c44b42; }
   .scrim { display: block; position: fixed; z-index: 10; inset: var(--topbar) 0 0 0; border: 0; background: rgba(9,24,19,.5); }
   .content { padding-left: 0; }
   .view { padding: 35px 20px 55px; }
+  .editor-view { padding-top: 82px; }
   .lesson-grid { grid-template-columns: 1fr; }
   .board-column { max-width: 600px; width: 100%; margin: 0 auto; }
   .review-workspace { grid-template-columns: 1fr; }
@@ -379,9 +377,6 @@ input.invalid { border-color: #c44b42; }
   .sidebar.open { transform: translateX(0); }
   .scrim { display: block; position: fixed; z-index: 10; inset: 0; border: 0; background: rgba(9,24,19,.5); }
   .content { height: 100dvh; padding: 0; overflow: hidden; }
-  .chapter-switcher { top: 9px; right: 12px; }
-  .chapter-switcher a { min-width: 29px; padding-inline: 8px; font-size: 0; text-align: center; }
-  .chapter-switcher a::after { content: attr(data-chapter-id); font-size: 11px; }
   .lesson-reader { width: 100%; max-width: none; height: 100dvh; padding: 10px 12px; overflow: hidden; }
   .guided-layout { height: 100%; grid-template-columns: var(--landscape-board-column) minmax(0, 1fr); gap: 12px; align-items: stretch; }
   .sticky-board { position: static; top: auto; width: 100%; max-width: none; height: 100%; margin: 0; padding-right: 4px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }

@@ -183,7 +183,7 @@ const builtByBlock = new Map<string, BuiltLine[]>();
 const unresolvedTokens: Array<{ blockId: string; source: string }> = [];
 
 for (const block of LEGACY_C_BLOCKS) {
-  if (!("text" in block)) {
+  if (!("text" in block) || block.type === "move-sequence") {
     parsedBlocks.push(block);
     continue;
   }
