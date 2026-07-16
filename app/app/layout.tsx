@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Catalan Atelier · Complete Chapters",
-  description: "Source-grounded Catalan lessons with board, diagrams, review, and PDF import verification.",
+  description: "Markdown-authored Catalan lessons with navigable chess variations and analysis.",
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
 };
 

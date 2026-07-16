@@ -13,19 +13,19 @@ export function loadAllChapters(): MarkdownChapter[] {
     return parseChapter(filename, content as string);
   });
 
-  entries.sort((a, b) => a.order - b.order);
+  entries.sort((a, b) => a.chapterNumber - b.chapterNumber);
 
   const seenIds = new Set<string>();
-  const seenOrders = new Set<number>();
+  const seenChapterNumbers = new Set<number>();
   for (const chapter of entries) {
     if (seenIds.has(chapter.id)) {
       throw new Error(`Duplicate chapter id: ${chapter.id}`);
     }
-    if (seenOrders.has(chapter.order)) {
-      throw new Error(`Duplicate chapter order: ${chapter.order}`);
+    if (seenChapterNumbers.has(chapter.chapterNumber)) {
+      throw new Error(`Duplicate chapter number: ${chapter.chapterNumber}`);
     }
     seenIds.add(chapter.id);
-    seenOrders.add(chapter.order);
+    seenChapterNumbers.add(chapter.chapterNumber);
   }
 
   _chapters = entries;
@@ -44,7 +44,7 @@ export function getChapterSummaries() {
   return loadAllChapters().map((c) => ({
     id: c.id,
     label: `Chapter ${c.chapterNumber}`,
-    shortLabel: `Chapter ${c.chapterNumber}`,
+    title: c.title,
     pageCount: c.pages.length,
   }));
 }

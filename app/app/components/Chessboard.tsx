@@ -1,5 +1,8 @@
 "use client";
 
+/* Chess pieces are local SVG sprites sized by their board squares. */
+/* eslint-disable @next/next/no-img-element */
+
 import { memo, useMemo, useState } from "react";
 import { Chess, Square } from "chess.js";
 import type { BoardMoveInput, PromotionPiece } from "../board-analysis";

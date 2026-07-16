@@ -1,274 +1,195 @@
 "use client";
 
+/* Static lesson diagrams use the same local piece sprites as the main board. */
+/* eslint-disable @next/next/no-img-element */
+
 import { memo, ReactNode, useMemo } from "react";
-import { Chess } from "chess.js";
-import { Chessboard } from "./Chessboard";
-import { loadChapterById, loadChapterByNumber } from "../lib/chapter-markdown-loader";
+import { Chess, type Square } from "chess.js";
+import { MarkdownMoveResolver, type MarkdownMoveToken, type MoveNavigation } from "../lib/markdown-moves";
+import { extractFenBlocks } from "../lib/markdown-chapter";
 
-const SOURCE_MOVE_TOKEN = /(?:\d+\.(?:\.\.)?\s*)?(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|[a-h]x[a-h][1-8]|[a-h][1-8])[+#]?[!?N=]*/g;
+type MoveHandler = (navigation: MoveNavigation) => void;
 
-const SQUARE_ONLY = /^[a-h][1-8]$/;
-
-function isLikelyProseSquare(text: string, at: number, source: string): boolean {
-  const bare = source.replace(/^\d+\.(?:\.\.)?\s*/, "");
-  if (!SQUARE_ONLY.test(bare)) return false;
-  const prefix = text.slice(Math.max(0, at - 8), at).toLowerCase();
-  if (/(?:^|\s)(?:on|to|the|a|toward) $/.test(prefix)) return true;
-  if (text.slice(at + source.length, at + source.length + 7).toLowerCase().startsWith("-square")) return true;
-  return false;
-}
-
-function normalizeSan(raw: string): string {
-  let san = raw.replace(/^\d+\.(?:\.\.)?\s*/, "").replace(/[!?N=*∞±∓→←]+/g, "").trim();
-  san = san.replace(/0/g, "O");
-  if (/^O-O-O/i.test(san)) san = "O-O-O";
-  else if (/^O-O/i.test(san)) san = "O-O";
-  san = san.replace(/[+#]+$/, "");
-  return san;
-}
-
-type MoveButton = { display: string; fen: string | null; index: number };
-
-type MoveContext = { boards: Chess[]; spine: Chess[] };
-
-const START_FEN = new Chess().fen();
-const MAX_BOARDS = 96;
-
-function fenExists(boards: Chess[], fen: string): boolean {
-  for (const board of boards) if (board.fen() === fen) return true;
-  return false;
-}
-
-function tryMove(fen: string, san: string): string | null {
-  try {
-    const next = new Chess(fen);
-    next.move(san, { strict: true });
-    return next.fen();
-  } catch {
-    return null;
-  }
-}
-
-function extractMoveButtons(text: string, ctx: MoveContext): MoveButton[] {
-  const buttons: MoveButton[] = [];
-  for (const match of text.matchAll(SOURCE_MOVE_TOKEN)) {
-    const source = match[0].trim();
-    if (!source) continue;
-    if (isLikelyProseSquare(text, match.index ?? 0, source)) continue;
-    const san = normalizeSan(source);
-    if (!san) continue;
-    let fen: string | null = null;
-    // Try every reachable position: the live branch frontier plus the full move history (spine).
-    // The spine keeps earlier recap/opening positions alive so standalone fragments like `4...dxc4`
-    // stay playable, while the frontier lets sibling variations share a diagram and still diverge.
-    const candidates = [...ctx.boards, ...ctx.spine];
-    for (const board of candidates) {
-      const result = tryMove(board.fen(), san);
-      if (result !== null) {
-        fen = result;
-        const next = new Chess(result);
-        if (ctx.boards.length < MAX_BOARDS && !fenExists(ctx.boards, result)) ctx.boards.push(next);
-        if (!fenExists(ctx.spine, result)) ctx.spine.push(next);
-        break;
-      }
+function StaticChessboard({ fen }: { fen: string }) {
+  const chess = new Chess(fen);
+  const pieces: ReactNode[] = [];
+  for (let rank = 8; rank >= 1; rank--) {
+    for (let file = 0; file < 8; file++) {
+      const square = `${String.fromCharCode(97 + file)}${rank}` as Square;
+      const piece = chess.get(square);
+      if (!piece) continue;
+      pieces.push(<img
+        alt=""
+        aria-hidden="true"
+        className="static-board-piece"
+        data-color={piece.color}
+        data-piece={piece.type}
+        decoding="async"
+        key={square}
+        src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`}
+        style={{ left: `${file * 12.5}%`, top: `${(8 - rank) * 12.5}%` }}
+      />);
     }
-    buttons.push({ display: source, fen, index: match.index ?? 0 });
   }
-  return buttons;
+  return <div className="static-board" role="img" aria-label={`Chess position: ${fen}`}>{pieces}</div>;
 }
 
-function renderInlineWithMoves(
-  text: string,
-  ctx: MoveContext,
-  onMove: (fen: string) => void,
-  keyPrefix: string,
-): ReactNode[] {
-  const buttons = extractMoveButtons(text, ctx);
-  if (buttons.length === 0) return [text];
-
-  const inlineRegex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g;
-  const out: ReactNode[] = [];
-  let cursor = 0;
-  let lastButtonEnd = 0;
-  let bIdx = 0;
-  const pushPlain = (segment: string) => {
-    if (!segment) return;
-    let m: RegExpExecArray | null;
-    inlineRegex.lastIndex = 0;
-    let plainCursor = 0;
-    const segs: ReactNode[] = [];
-    while ((m = inlineRegex.exec(segment)) !== null) {
-      if (m.index > plainCursor) segs.push(segment.slice(plainCursor, m.index));
-      if (m[1]?.startsWith("***")) segs.push(<em key={`${keyPrefix}-e${plainCursor}`}><strong>{m[2]}</strong></em>);
-      else if (m[1]?.startsWith("**")) segs.push(<strong key={`${keyPrefix}-s${plainCursor}`}>{m[3]}</strong>);
-      else if (m[1]?.startsWith("*")) segs.push(<em key={`${keyPrefix}-i${plainCursor}`}>{m[4]}</em>);
-      else if (m[1]?.startsWith("`")) segs.push(<code key={`${keyPrefix}-c${plainCursor}`}>{m[5]}</code>);
-      plainCursor = inlineRegex.lastIndex;
-    }
-    if (plainCursor < segment.length) segs.push(segment.slice(plainCursor));
-    if (segs.length === 1) out.push(segs[0]);
-    else if (segs.length) out.push(<span key={`${keyPrefix}-p${cursor}`}>{segs}</span>);
-  };
-
-  for (const btn of buttons) {
-    const at = btn.index;
-    if (at > lastButtonEnd) pushPlain(text.slice(lastButtonEnd, at));
-    if (btn.fen) {
-      out.push(
-        <button
-          type="button"
-          key={`${keyPrefix}-mv-${bIdx}`}
-          className="inline-move interactive-move"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMove(btn.fen as string); }}
-          aria-label={`Show position after ${btn.display}`}
-        >{btn.display}</button>,
-      );
-    } else {
-      out.push(<span key={`${keyPrefix}-mv-${bIdx}`} className="inline-move unresolved">{btn.display}</span>);
-    }
-    lastButtonEnd = at + btn.display.length;
-    bIdx++;
-    cursor = lastButtonEnd;
-  }
-  if (lastButtonEnd < text.length) pushPlain(text.slice(lastButtonEnd));
-  return out.length ? out : [text];
-}
-
-function FenBoard({ fen }: { fen: string }) {
-  try {
-    new Chess(fen);
-  } catch {
-    return <div className="fen-invalid" role="alert">Invalid FEN position</div>;
-  }
-  return (
-    <div className="fen-block">
-      <strong>FEN:</strong>
-      <div className="fen-board-container">
-        <Chessboard fen={fen} />
-      </div>
-      <code className="fen-string">{fen}</code>
+function FenBoard({ fen, label, navigation, onMove }: { fen: string; label: string; navigation: MoveNavigation; onMove: MoveHandler }) {
+  try { new Chess(fen); }
+  catch { return <div className="fen-invalid" role="alert">Invalid FEN position</div>; }
+  return <div className="fen-block">
+    <div className="fen-heading">
+      <strong>{label}</strong>
+      <button type="button" onClick={() => onMove(navigation)}>Show on main board</button>
     </div>
-  );
+    <div className="fen-board-container"><StaticChessboard fen={fen} /></div>
+    <code className="fen-string">{fen}</code>
+  </div>;
 }
 
-function parseMarkdownToReact(markdown: string, onMove: (fen: string) => void): ReactNode[] {
+function renderPlaceholders(template: string, tokens: MarkdownMoveToken[], onMove: MoveHandler, key: string): ReactNode[] {
+  const placeholder = /\uE000(\d+)\uE001/g;
+  const result: ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = placeholder.exec(template)) !== null) {
+    if (match.index > cursor) result.push(template.slice(cursor, match.index));
+    const token = tokens[Number(match[1])];
+    if (token.navigation) {
+      result.push(<button
+        type="button"
+        className="inline-move interactive-move"
+        aria-label={`Show position after ${token.display}`}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onMove(token.navigation as MoveNavigation);
+        }}
+        key={`${key}-move-${match[1]}`}
+      >{token.display}</button>);
+    } else {
+      result.push(<span key={`${key}-plain-${match[1]}`}>{token.display}</span>);
+    }
+    cursor = placeholder.lastIndex;
+  }
+  if (cursor < template.length) result.push(template.slice(cursor));
+  return result;
+}
+
+function renderFormatted(template: string, tokens: MarkdownMoveToken[], onMove: MoveHandler, key: string): ReactNode[] {
+  const inline = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g;
+  const output: ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = inline.exec(template)) !== null) {
+    if (match.index > cursor) output.push(...renderPlaceholders(template.slice(cursor, match.index), tokens, onMove, `${key}-${cursor}`));
+    const content = match[2] ?? match[3] ?? match[4] ?? match[5] ?? "";
+    const children = renderPlaceholders(content, tokens, onMove, `${key}-${match.index}`);
+    if (match[2] !== undefined) output.push(<strong key={`${key}-bolditalic-${match.index}`}><em>{children}</em></strong>);
+    else if (match[3] !== undefined) output.push(<strong key={`${key}-bold-${match.index}`}>{children}</strong>);
+    else if (match[4] !== undefined) output.push(<em key={`${key}-italic-${match.index}`}>{children}</em>);
+    else output.push(<code key={`${key}-code-${match.index}`}>{children}</code>);
+    cursor = inline.lastIndex;
+  }
+  if (cursor < template.length) output.push(...renderPlaceholders(template.slice(cursor), tokens, onMove, `${key}-${cursor}`));
+  return output;
+}
+
+function renderInline(text: string, resolver: MarkdownMoveResolver, onMove: MoveHandler, key: string): ReactNode[] {
+  const tokens = resolver.resolveText(text);
+  if (tokens.length === 0) return renderFormatted(text, tokens, onMove, key);
+  let template = text;
+  for (let index = tokens.length - 1; index >= 0; index--) {
+    const token = tokens[index];
+    template = `${template.slice(0, token.index)}\uE000${index}\uE001${template.slice(token.index + token.display.length)}`;
+  }
+  return renderFormatted(template, tokens, onMove, key);
+}
+
+function parseMarkdown(markdown: string, onMove: MoveHandler): ReactNode[] {
   const lines = markdown.split(/\r?\n/);
   const nodes: ReactNode[] = [];
-  let i = 0;
-  const startBoard = new Chess(START_FEN);
-  const ctx: MoveContext = { boards: [startBoard], spine: [startBoard] };
+  const resolver = new MarkdownMoveResolver();
+  extractFenBlocks(markdown).forEach(({ fen }, fenIndex) => resolver.addRoot(fen, `Chapter position ${fenIndex + 1}`));
+  let index = 0;
+  let currentHeading = "Diagram position";
 
-  const renderInline = (text: string, key: string): ReactNode =>
-    renderInlineWithMoves(text, ctx, onMove, key);
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) { index++; continue; }
 
-  const processFenBlocks = (text: string, key: string): ReactNode[] => {
-    const parts: ReactNode[] = [];
-    const fenRegex = /\*\*FEN:\*\*\s*\n\s*`([^`]+)`/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    let first = true;
-    while ((match = fenRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-      const fen = match[1].trim();
-      if (fen.split(" ").length >= 4) {
-        const board = new Chess(fen);
-        ctx.boards = [board];
-        parts.push(<FenBoard key={`${key}-fen-${match.index}`} fen={fen} />);
-      } else {
-        parts.push(match[0]);
-      }
-      lastIndex = fenRegex.lastIndex;
+    const hiddenFen = /^<!--\s*FEN:\s*([^>]+?)\s*-->$/.exec(trimmed);
+    if (hiddenFen) {
+      try { resolver.setAnchor(hiddenFen[1].trim(), "Variation start"); } catch { /* surfaced by chapter checks */ }
+      index++;
+      continue;
     }
-    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-    return parts;
-  };
 
-  const renderParagraph = (text: string, key: string): ReactNode => {
-    if (text.includes("**FEN:**")) return <p key={key}>{processFenBlocks(text, key)}</p>;
-    return <p key={key}>{renderInline(text, key)}</p>;
-  };
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    if (line.trim() === "") { i++; continue; }
-
-    if (/^## /i.test(line) && /^## Page \d+/i.test(line)) {
-      nodes.push(<h2 key={`h2-${i}`} className="page-heading-markdown">{renderInline(line.replace(/^##\s+/, ""), `h2-${i}`)}</h2>);
-      i++; continue;
-    }
-    if (/^### /i.test(line)) {
-      nodes.push(<h3 key={`h3-${i}`}>{renderInline(line.replace(/^###\s+/, ""), `h3-${i}`)}</h3>);
-      i++; continue;
-    }
-    if (/^#### /i.test(line)) {
-      nodes.push(<h4 key={`h4-${i}`}>{renderInline(line.replace(/^####\s+/, ""), `h4-${i}`)}</h4>);
-      i++; continue;
-    }
-    if (/^##### /i.test(line)) {
-      nodes.push(<h5 key={`h5-${i}`}>{renderInline(line.replace(/^#####\s+/, ""), `h5-${i}`)}</h5>);
-      i++; continue;
-    }
-    if (/^---+\s*$/.test(line)) { nodes.push(<hr key={`hr-${i}`} />); i++; continue; }
-    if (/^&nbsp;/.test(line.trim())) { i++; continue; }
-
-    if (line.trim().startsWith("**FEN:**")) {
-      const fenBlock = [line];
-      i++;
-      while (i < lines.length) {
-        const next = lines[i].trim();
-        if (next.startsWith("`") && next.endsWith("`") && !next.startsWith("**")) {
-          fenBlock.push(lines[i]);
-          i++;
-        } else break;
-      }
-      const text = fenBlock.join("\n");
-      const m = /\*\*FEN:\*\*\s*\n\s*`([^`]+)`/.exec(text);
-      if (m) {
-        const fen = m[1].trim();
-        if (fen.split(" ").length >= 4) {
-          ctx.boards = [new Chess(fen)];
+    if (trimmed.startsWith("**FEN:**")) {
+      const next = lines[index + 1]?.trim() ?? "";
+      const fenMatch = /^`([^`]+)`$/.exec(next);
+      if (fenMatch) {
+        const fen = fenMatch[1].trim();
+        try {
+          const label = currentHeading === "Diagram position" ? currentHeading : `${currentHeading} — position`;
+          const navigation = resolver.setAnchor(fen, label);
+          nodes.push(<FenBoard fen={fen} label={label} navigation={navigation} onMove={onMove} key={`fen-${index}`} />);
+        } catch {
+          nodes.push(<div className="fen-invalid" role="alert" key={`fen-${index}`}>Invalid FEN position</div>);
         }
-        nodes.push(<div key={`fen-block-${i}`}><FenBoard fen={fen} /></div>);
+        index += 2;
+        continue;
       }
+    }
+
+    if (/^---+\s*$/.test(trimmed)) {
+      nodes.push(<hr key={`hr-${index}`} />);
+      index++;
       continue;
     }
 
-    if (line.trim().startsWith("-") || line.trim().startsWith("* ")) {
-      const listItems: ReactNode[] = [];
-      while (i < lines.length) {
-        const trimmed = lines[i].trim();
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          listItems.push(<li key={`li-${i}`}>{renderInline(trimmed.replace(/^[-*]\s+/, ""), `li-${i}`)}</li>);
-          i++;
-        } else break;
-      }
-      nodes.push(<ul key={`ul-${i}`}>{listItems}</ul>);
+    const heading = /^(#{1,5})\s+(.+)$/.exec(line);
+    if (heading) {
+      const level = heading[1].length;
+      currentHeading = heading[2].replace(/[*_`]/g, "").trim();
+      const content = renderInline(heading[2], resolver, onMove, `heading-${index}`);
+      if (level === 1) nodes.push(<h1 key={`h1-${index}`}>{content}</h1>);
+      else if (level === 2) nodes.push(<h2 className="page-heading-markdown" key={`h2-${index}`}>{content}</h2>);
+      else if (level === 3) nodes.push(<h3 key={`h3-${index}`}>{content}</h3>);
+      else if (level === 4) nodes.push(<h4 key={`h4-${index}`}>{content}</h4>);
+      else nodes.push(<h5 key={`h5-${index}`}>{content}</h5>);
+      index++;
       continue;
     }
 
-    const paragraphLines: string[] = [line];
-    i++;
-    while (i < lines.length) {
-      const next = lines[i];
-      if (next.trim() === "" || /^#{1,5}\s/.test(next) || /^---+\s*$/.test(next) || next.trim().startsWith("**FEN:**") || next.trim().startsWith("* ") || next.trim().startsWith("- ")) break;
-      paragraphLines.push(next);
-      i++;
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items: ReactNode[] = [];
+      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
+        const item = lines[index].replace(/^\s*[-*]\s+/, "");
+        items.push(<li key={`item-${index}`}>{renderInline(item, resolver, onMove, `item-${index}`)}</li>);
+        index++;
+      }
+      nodes.push(<ul key={`list-${index}`}>{items}</ul>);
+      continue;
     }
-    nodes.push(renderParagraph(paragraphLines.join("\n"), `p-${i}`));
+
+    const paragraph = [line];
+    index++;
+    while (index < lines.length) {
+      const next = lines[index];
+      const nextTrimmed = next.trim();
+      if (!nextTrimmed || /^#{1,5}\s/.test(next) || /^---+\s*$/.test(nextTrimmed) || /^\s*[-*]\s+/.test(next) || nextTrimmed.startsWith("**FEN:**") || /^<!--\s*FEN:/.test(nextTrimmed)) break;
+      paragraph.push(next);
+      index++;
+    }
+    const text = paragraph.join("\n");
+    nodes.push(<p key={`paragraph-${index}`}>{renderInline(text, resolver, onMove, `paragraph-${index}`)}</p>);
   }
-
   return nodes;
 }
 
-export const MarkdownChapterView = memo(function MarkdownChapterView({ chapterId, onMove }: { chapterId: string; onMove: (fen: string) => void }) {
-  const markdown = useMemo(() => {
-    const number = parseInt(chapterId, 10);
-    const chapter = Number.isFinite(number) ? loadChapterByNumber(number) : loadChapterById(chapterId);
-    if (!chapter) return `# Chapter ${chapterId}\n\nContent unavailable.`;
-    return chapter.pages.map((p) => p.markdown).join("\n\n");
-  }, [chapterId]);
-
-  const elements = useMemo(() => parseMarkdownToReact(markdown, onMove), [markdown, onMove]);
-  return <article className="narrative markdown-narrative" aria-label="Chapter source text">{elements}</article>;
+export const MarkdownChapterView = memo(function MarkdownChapterView({ markdown, onMove }: { markdown: string; onMove: MoveHandler }) {
+  const elements = useMemo(() => parseMarkdown(markdown, onMove), [markdown, onMove]);
+  return <article className="narrative markdown-narrative" aria-label="Chapter lesson">{elements}</article>;
 });

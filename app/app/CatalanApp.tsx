@@ -1,668 +1,174 @@
 "use client";
 
-import { ChangeEvent, memo, MouseEvent, ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Chess, Square } from "chess.js";
+import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Chess } from "chess.js";
 import { useRouter } from "next/navigation";
-import { B2_LESSON } from "./b2-lesson";
-import type { ChapterConfig, ChapterSummary } from "./chapter-definition";
-import { canonicalize, sha256 } from "./canonical";
 import LessonLoading from "./LessonLoading";
-import type { DiagramLink, LessonDocument, MoveReference, ReviewItem, ReviewOverlay, SourceVerificationResult, VariationMove, VariationNode } from "./lesson-model";
-import { legalTargets, playAnalysisMove } from "./board-analysis";
-import type { AnalysisMove, BoardMoveInput, PromotionPiece } from "./board-analysis";
-import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishClient, StockfishEvent } from "./stockfish-client";
-import { compileInteractiveMoves } from "./lib/interactive-moves";
-import type { InteractiveMoveEntry } from "./lib/interactive-moves";
+import { Chessboard } from "./components/Chessboard";
 import { MarkdownChapterView } from "./components/MarkdownRenderer";
+import { playAnalysisMove } from "./board-analysis";
+import type { AnalysisMove, BoardMoveInput } from "./board-analysis";
+import { extractFenBlocks, type ChapterSummary, type MarkdownChapter } from "./lib/markdown-chapter";
+import type { MoveNavigation } from "./lib/markdown-moves";
+import { scoreToWhiteFraction } from "./stockfish-client";
+import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishClient, StockfishEvent } from "./stockfish-client";
 
-const MARKDOWN_CHAPTER_IDS = new Set(["9", "10", "11"]);
-
-type View = "lesson" | "review" | "import";
-type ActivePosition = { lineId: string; ply: number };
-type ReviewTab = "text" | "moves" | "boards";
-
-const LEGACY_REVIEW_KEY = "catalan-b2-review-v1";
-const EDITOR_KEY = "catalan-editor-mode-v1";
 const CHAPTER_NAVIGATION_PAINT_DELAY_MS = 120;
-const INTERACTIVE_MOVE_CHAPTER_IDS = new Set(["10", "11"]);
-
-const lessonLineIndexes = new WeakMap<LessonDocument, Map<string, VariationNode>>();
-const lessonSpanIndexes = new WeakMap<LessonDocument, Map<string, LessonDocument["sourceSpans"][number]>>();
-const lessonDiagramIndexes = new WeakMap<LessonDocument, Map<string, DiagramLink>>();
-const lessonPathCaches = new WeakMap<LessonDocument, Map<string, VariationMove[]>>();
-type ResolvedPosition = { fen: string; path: VariationMove[]; valid: boolean; activeMove: VariationMove | undefined };
-const positionCaches = new WeakMap<ReviewOverlay, WeakMap<LessonDocument, Map<string, ResolvedPosition>>>();
-
-const emptyOverlay = (config: ChapterConfig): ReviewOverlay => ({
-  schemaVersion: 3,
-  sourceSha256: config.lesson.source.sha256,
-  lessonSha256: config.importDefinition.expectedCanonicalHash ?? "legacy",
-  items: {},
-});
-const lineById = (lesson: LessonDocument, id: string) => {
-  let index = lessonLineIndexes.get(lesson);
-  if (!index) {
-    index = new Map(lesson.lines.map((line) => [line.id, line]));
-    lessonLineIndexes.set(lesson, index);
-  }
-  return index.get(id) ?? lesson.lines[0];
-};
-const spanById = (lesson: LessonDocument, id: string) => {
-  let index = lessonSpanIndexes.get(lesson);
-  if (!index) {
-    index = new Map(lesson.sourceSpans.map((span) => [span.id, span]));
-    lessonSpanIndexes.set(lesson, index);
-  }
-  return index.get(id) ?? lesson.sourceSpans[0];
-};
-const diagramById = (lesson: LessonDocument, id: string) => {
-  let index = lessonDiagramIndexes.get(lesson);
-  if (!index) {
-    index = new Map(lesson.diagrams.map((diagram) => [diagram.id, diagram]));
-    lessonDiagramIndexes.set(lesson, index);
-  }
-  return index.get(id) ?? lesson.diagrams[0];
-};
-
-function effectiveSan(move: VariationMove, overlay: ReviewOverlay): string {
-  const item = overlay.items[move.id];
-  return item?.decision === "accepted" && item.correctedSan?.trim() ? item.correctedSan.trim() : move.san;
-}
-
-function linePrefix(lesson: LessonDocument, line: VariationNode): VariationMove[] {
-  if (!line.parentLineId) return [];
-  const parent = lineById(lesson, line.parentLineId);
-  return [...linePrefix(lesson, parent), ...parent.moves.slice(0, line.parentPly)];
-}
-
-function linePath(lesson: LessonDocument, lineId: string): VariationMove[] {
-  let cache = lessonPathCaches.get(lesson);
-  if (!cache) {
-    cache = new Map();
-    lessonPathCaches.set(lesson, cache);
-  }
-  const cached = cache.get(lineId);
-  if (cached) return cached;
-  const line = lineById(lesson, lineId);
-  const path = [...linePrefix(lesson, line), ...line.moves];
-  cache.set(lineId, path);
-  return path;
-}
-
-function lineStartFen(lesson: LessonDocument, line: VariationNode): string {
-  if (line.startFen) return line.startFen;
-  if (line.parentLineId) return lineStartFen(lesson, lineById(lesson, line.parentLineId));
-  return lesson.basePosition.fen;
-}
-
-function localMovePly(lesson: LessonDocument, lineId: string, moveIndex: number): number {
-  return linePrefix(lesson, lineById(lesson, lineId)).length + moveIndex + 1;
-}
-
-function positionFor(lesson: LessonDocument, active: ActivePosition, overlay: ReviewOverlay): ResolvedPosition {
-  let lessonCaches = positionCaches.get(overlay);
-  if (!lessonCaches) {
-    lessonCaches = new WeakMap();
-    positionCaches.set(overlay, lessonCaches);
-  }
-  let cache = lessonCaches.get(lesson);
-  if (!cache) {
-    cache = new Map();
-    lessonCaches.set(lesson, cache);
-  }
-  const cacheKey = `${active.lineId}:${active.ply}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
-  const path = linePath(lesson, active.lineId);
-  const startFen = lineStartFen(lesson, lineById(lesson, active.lineId));
-  const chess = new Chess(startFen);
-  let valid = true;
-  try {
-    path.slice(0, active.ply).forEach((move) => chess.move(effectiveSan(move, overlay)));
-  } catch {
-    valid = false;
-    const fallback = new Chess(startFen);
-    path.slice(0, active.ply).forEach((move) => fallback.move(move.san));
-    const resolved = { fen: fallback.fen(), path, valid, activeMove: path[active.ply - 1] };
-    cache.set(cacheKey, resolved);
-    return resolved;
-  }
-  const resolved = { fen: chess.fen(), path, valid, activeMove: path[active.ply - 1] };
-  cache.set(cacheKey, resolved);
-  return resolved;
-}
-
-function scoreToWhiteFraction(score: EngineScore | null): number | null {
-  if (!score) return null;
-  if (score.kind === "mate") return score.whiteValue > 0 ? 0.98 : score.whiteValue < 0 ? 0.02 : 0.5;
-  return Math.min(0.94, Math.max(0.06, 0.5 + score.whiteValue / 1200));
-}
-
-function migrateReview(config: ChapterConfig): ReviewOverlay {
-  const validIds = new Set([
-    ...config.lesson.blocks.map((block) => block.id),
-    ...config.lesson.diagrams.map((diagram) => diagram.id),
-    ...config.lesson.lines.flatMap((line) => line.moves.map((move) => move.id)),
-  ]);
-  const stored = localStorage.getItem(config.reviewKey);
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored) as ReviewOverlay | { schemaVersion: 2; fixtureSha256: string; items: Record<string, ReviewItem>; legacyTextReview?: ReviewOverlay["legacyTextReview"] };
-      if (parsed.schemaVersion === 3 && parsed.sourceSha256 === config.lesson.source.sha256 && parsed.lessonSha256 === (config.importDefinition.expectedCanonicalHash ?? "legacy")) return parsed;
-      if (parsed.schemaVersion === 2 && parsed.fixtureSha256 === config.lesson.source.sha256) {
-        const next = emptyOverlay(config);
-        next.items = Object.fromEntries(Object.entries(parsed.items).filter(([id]) => validIds.has(id)));
-        next.orphanedItems = Object.fromEntries(Object.entries(parsed.items).filter(([id]) => !validIds.has(id)));
-        next.legacyTextReview = parsed.legacyTextReview;
-        localStorage.setItem(config.reviewKey, JSON.stringify(next));
-        return next;
-      }
-    } catch {}
-  }
-  const next = emptyOverlay(config);
-  if (config.id !== "1") return next;
-  const legacy = localStorage.getItem(LEGACY_REVIEW_KEY);
-  if (!legacy) return next;
-  try {
-    const old = JSON.parse(legacy) as Record<string, unknown>;
-    const moveDecision = typeof old.moveDecision === "string" ? old.moveDecision : "pending";
-    next.items["b2-main-10b-d4"] = {
-      decision: moveDecision === "accepted" || moveDecision === "needs correction" ? moveDecision : "pending",
-      correctedSan: typeof old.canonicalSan === "string" ? old.canonicalSan : undefined,
-      punctuation: typeof old.punctuation === "string" ? old.punctuation : undefined,
-      novelty: typeof old.novelty === "string" ? old.novelty : undefined,
-      sourceToken: "d4!?N",
-    };
-    const diagrams = old.diagrams as Record<string, Record<string, string>> | undefined;
-    for (const diagram of B2_LESSON.diagrams) {
-      const item = diagrams?.[diagram.id];
-      if (!item) continue;
-      next.items[diagram.id] = {
-        decision: item.decision === "accepted" || item.decision === "needs correction" ? item.decision : "pending",
-        correctedFen: item.fen,
-        confidence: item.confidence === "visually plausible" || item.confidence === "manually confirmed" ? item.confidence : "unreviewed",
-        note: item.note,
-      };
-    }
-    if (typeof old.transcription === "string") next.legacyTextReview = { transcription: old.transcription, decision: typeof old.textDecision === "string" ? old.textDecision : "pending" };
-    localStorage.setItem(config.reviewKey, JSON.stringify(next));
-  } catch {}
-  return next;
-}
-
-const Chessboard = memo(function Chessboard({ fen, flipped = false, onMove, lastMove }: { fen: string; flipped?: boolean; onMove?: (move: BoardMoveInput) => void; lastMove?: BoardMoveInput | null }) {
-  const chess = useMemo(() => new Chess(fen), [fen]);
-  const interactive = Boolean(onMove);
-  const boardKey = `${fen}:${flipped ? "flipped" : "normal"}`;
-  const [selectionState, setSelectionState] = useState<{ boardKey: string; square: Square | null }>({ boardKey, square: null });
-  const [promotionState, setPromotionState] = useState<{ boardKey: string; move: { from: Square; to: Square } | null }>({ boardKey, move: null });
-  const selected = selectionState.boardKey === boardKey ? selectionState.square : null;
-  const promotion = promotionState.boardKey === boardKey ? promotionState.move : null;
-  const setSelected = (square: Square | null) => setSelectionState({ boardKey, square });
-  const setPromotion = (move: { from: Square; to: Square } | null) => setPromotionState({ boardKey, move });
-  const targets = useMemo(() => selected ? legalTargets(fen, selected) : [], [fen, selected]);
-  const files = flipped ? ["h", "g", "f", "e", "d", "c", "b", "a"] : ["a", "b", "c", "d", "e", "f", "g", "h"];
-  const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
-
-  const targetFor = (square: Square) => targets.filter((target) => target.to === square);
-  const selectSquare = (square: Square) => {
-    if (!interactive || !onMove) return;
-    const piece = chess.get(square);
-    const options = targetFor(square);
-    if (selected) {
-      if (square === selected) {
-        setSelected(null);
-        return;
-      }
-      if (options.length) {
-        if (options.some((target) => target.promotion)) setPromotion({ from: selected, to: square });
-        else onMove({ from: selected, to: square });
-        setSelected(null);
-        return;
-      }
-      setSelected(piece?.color === chess.turn() ? square : null);
-      return;
-    }
-    if (piece?.color === chess.turn()) setSelected(square);
-  };
-  const dropMove = (from: Square, to: Square) => {
-    if (!interactive || !onMove) return;
-    const fromTargets = legalTargets(fen, from);
-    const options = fromTargets.filter((target) => target.to === to);
-    if (!options.length) {
-      setSelected(null);
-      return;
-    }
-    if (options.some((target) => target.promotion)) setPromotion({ from, to });
-    else onMove({ from, to });
-    setSelected(null);
-  };
-  const choosePromotion = (piece: PromotionPiece) => {
-    if (promotion && onMove) onMove({ from: promotion.from, to: promotion.to, promotion: piece });
-    setPromotion(null);
-    setSelected(null);
-  };
-  const boardLabel = interactive ? `Interactive chess position: ${fen}` : `Chess position: ${fen}`;
-  return <div className={`board ${interactive ? "interactive" : ""}`} role={interactive ? "grid" : "img"} aria-label={boardLabel}>
-    {ranks.flatMap((rank) => files.map((file) => {
-      const square = `${file}${rank}` as Square;
-      const piece = chess.get(square);
-      const light = (file.charCodeAt(0) - 97 + rank) % 2 === 0;
-      const options = targetFor(square);
-      const isSelected = selected === square;
-      const isLastMove = lastMove?.from === square || lastMove?.to === square;
-      const classes = `square ${light ? "light" : "dark"} ${interactive ? "interactive" : ""} ${isSelected ? "selected" : ""} ${options.length ? "legal-target" : ""} ${options.some((target) => target.capture) ? "capture-target" : ""} ${isLastMove ? "last-move" : ""}`;
-      const content = <>
-        {piece && <img data-color={piece.color} data-piece={piece.type} draggable={false} decoding="async" src={`/assets/pieces/mpchess/${piece.color}${piece.type.toUpperCase()}.svg`} alt={`${piece.color === "w" ? "White" : "Black"} ${piece.type}`} />}
-        {file === files[0] && <span className="rank-label">{rank}</span>}
-        {rank === ranks[ranks.length - 1] && <span className="file-label">{file}</span>}
-      </>;
-      const description = `${square}, ${piece ? `${piece.color === "w" ? "white" : "black"} ${piece.type}` : "empty"}${isSelected ? ", selected" : ""}${options.length ? ", legal destination" : ""}`;
-      if (!interactive) return <div className={classes} key={square}>{content}</div>;
-      return <button
-        type="button"
-        className={classes}
-        key={square}
-        aria-label={description}
-        draggable={Boolean(piece)}
-        onClick={() => selectSquare(square)}
-        onDragStart={(event) => {
-          if (!piece || piece.color !== chess.turn()) { event.preventDefault(); return; }
-          setSelected(square);
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", square);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          const source = event.dataTransfer.getData("text/plain") as Square;
-          if (source && source !== square) {
-            setSelected(source);
-            dropMove(source, square);
-          }
-        }}
-      >{content}</button>;
-    }))}
-    {promotion && <div className="promotion-picker" role="dialog" aria-modal="true" aria-label="Choose promotion piece">
-      <strong>Promote pawn</strong>
-      <div>{(["q", "r", "b", "n"] as const).map((piece) => <button type="button" key={piece} onClick={() => choosePromotion(piece)} aria-label={`Promote to ${piece === "q" ? "queen" : piece === "r" ? "rook" : piece === "b" ? "bishop" : "knight"}`}><img decoding="async" src={`/assets/pieces/mpchess/${chess.get(promotion.from)?.color ?? "w"}${piece.toUpperCase()}.svg`} alt="" /></button>)}</div>
-      <button type="button" className="promotion-cancel" onClick={() => setPromotion(null)}>Cancel</button>
-    </div>}
-  </div>;
-});
-
-function Decision({ value, onChange }: { value: ReviewItem["decision"]; onChange: (value: ReviewItem["decision"]) => void }) {
-  return <div className="decision" role="group" aria-label="Review decision">
-    {(["pending", "accepted", "needs correction"] as const).map((item) => <button key={item} className={value === item ? "selected" : ""} onClick={() => onChange(item)}>{item}</button>)}
-  </div>;
-}
-
-const SOURCE_MOVE_TOKEN = /(?:\d+\.(?:\.\.)?\s*)?(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|[a-h]x[a-h][1-8]|[a-h][1-8])[+#]?[!?N=]*/g;
-
-function RichText({ lesson, text, refs = [], overlay, onMove }: { lesson: LessonDocument; text: string; refs?: MoveReference[]; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void }) {
-  const output: ReactNode[] = [];
-  const usedReferences = new Set<number>();
-  const renderedMoves = new Set<string>();
-  let cursor = 0;
-  let index = 0;
-
-  for (const match of text.matchAll(SOURCE_MOVE_TOKEN)) {
-    const at = match.index ?? 0;
-    const source = match[0].trim();
-    if (!source) continue;
-    const bare = source.replace(/^\d+\.(?:\.\.)?\s*/, "");
-    if (/^[a-h][1-8]$/.test(bare)) {
-      const prefix = text.slice(Math.max(0, at - 8), at).toLowerCase();
-      if (/(?:^|\s)(?:on|to|the|a|toward) $/.test(prefix)) continue;
-      if (text.slice(at + source.length, at + source.length + 7).toLowerCase().startsWith("-square")) continue;
-    }
-    const forms = new Set([source, bare]);
-    const suppliedIndex = refs.findIndex((reference, referenceIndex) => !usedReferences.has(referenceIndex) && (forms.has(reference.source) || reference.source.endsWith(bare)));
-    if (suppliedIndex >= 0) usedReferences.add(suppliedIndex);
-    let reference = suppliedIndex >= 0 ? refs[suppliedIndex] : undefined;
-    if (!reference) {
-      const exact = lesson.lines.flatMap((line) => line.moves.map((move, moveIndex) => ({ lineId: line.id, moveIndex, move })))
-        .find(({ move }) => move.sourceToken === bare || move.san === bare);
-      reference = exact ? { source, lineId: exact.lineId, moveIndex: exact.moveIndex } : undefined;
-    }
-    if (!reference) continue;
-    const move = lineById(lesson, reference.lineId).moves[reference.moveIndex];
-    if (!move) continue;
-    const moveKey = `${reference.lineId}:${reference.moveIndex}`;
-    if (renderedMoves.has(moveKey)) continue;
-    renderedMoves.add(moveKey);
-    if (at > cursor) output.push(text.slice(cursor, at));
-    output.push(<button key={`${move.id}-${index}`} data-move-id={move.id} className="inline-move" onClick={() => onMove(reference.lineId, reference.moveIndex)} title={`Canonical SAN: ${effectiveSan(move, overlay)}`}>{source}</button>);
-    cursor = at + match[0].length;
-    index += 1;
-  }
-  output.push(text.slice(cursor));
-  return <>{output}</>;
-}
-
-function InteractiveRichText({ text, entries, onMove }: { text: string; entries: InteractiveMoveEntry[]; onMove: (fen: string) => void }): ReactNode {
-  if (!entries.length) return <>{text}</>;
-  const output: ReactNode[] = [];
-  let cursor = 0;
-  const remaining = [...entries];
-
-  for (const match of text.matchAll(SOURCE_MOVE_TOKEN)) {
-    const at = match.index ?? 0;
-    const source = match[0].trim();
-    if (!source) continue;
-    const bare = source.replace(/^\d+\.(?:\.\.)?\s*/, "");
-    if (/^[a-h][1-8]$/.test(bare)) {
-      const prefix = text.slice(Math.max(0, at - 8), at).toLowerCase();
-      if (/(?:^|\s)(?:on|to|the|a|toward) $/.test(prefix)) continue;
-      if (text.slice(at + source.length, at + source.length + 7).toLowerCase().startsWith("-square")) continue;
-    }
-    const entryIdx = remaining.findIndex((e) => e.displayText === source);
-    if (entryIdx === -1) continue;
-    const entry = remaining.splice(entryIdx, 1)[0];
-    if (at > cursor) output.push(<>{text.slice(cursor, at)}</>);
-    const ply = entry.ply;
-    output.push(<button
-      type="button"
-      key={`im-${ply}`}
-      className="inline-move interactive-move"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMove(entry.resultingFen); }}
-      aria-label={`Show position after ${source}`}
-    >{source}</button>);
-    cursor = at + match[0].length;
-  }
-  output.push(<>{text.slice(cursor)}</>);
-  return <>{output}</>;
-}
-
-function sourceEvidenceCrop(span: LessonDocument["sourceSpans"][number]): string {
-  const chapterMatch = /^\/source\/(chapter[78])\/pages\/printed-\d+\.png$/.exec(span.crop);
-  return chapterMatch ? `/source/${chapterMatch[1]}/regions/printed-${span.printedPage}-${span.column}.png` : span.crop;
-}
-
-function SourceRegion({ lesson, spanId }: { lesson: LessonDocument; spanId: string }) {
-  const span = spanById(lesson, spanId);
-  const inlinePdfText = /^\/source\/chapter[78]\//.test(span.crop);
-  return <div className="source-region">
-    <span>Source order {span.order}</span>
-    <strong>Printed page {span.printedPage} · {span.column} column</strong>
-    <details open={inlinePdfText}><summary>{inlinePdfText ? "Original PDF source" : "View source evidence"}</summary><img loading="lazy" decoding="async" src={sourceEvidenceCrop(span)} alt={`Printed page ${span.printedPage} ${span.column} column crop`} /></details>
-  </div>;
-}
-
-function DiagramCard({ diagram, overlay, onJump, compact = false }: { diagram: DiagramLink; overlay: ReviewOverlay; onJump: () => void; compact?: boolean }) {
-  const review = overlay.items[diagram.id];
-  const fen = review?.decision === "accepted" && review.correctedFen ? review.correctedFen : diagram.fen;
-  return <article className={`lesson-diagram ${compact ? "compact" : ""}`}>
-    <div className="diagram-heading"><div><span>{diagram.id}</span><h3>{diagram.role}</h3></div><button onClick={onJump}>Jump to position</button></div>
-    <div className="diagram-statuses"><span>{diagram.associationStatus} association</span><span>{diagram.positionStatus} position</span><span>{review?.decision === "accepted" ? "manually reviewed" : diagram.boardIdentityStatus + " identity"}</span></div>
-    {compact && <div className="diagram-preview-board"><Chessboard fen={fen} /></div>}
-    <details className="printed-diagram"><summary>View printed diagram</summary><img loading="lazy" decoding="async" src={diagram.crop} alt={`${diagram.id} printed chess diagram`} /></details>
-  </article>;
-}
-
-type BlockInteractiveData = { startingFen: string; entries: InteractiveMoveEntry[] };
-
-const Narrative = memo(function Narrative({ lesson, overlay, onMove, onJump, containerRef, interactiveData, onInteractiveMove }: { lesson: LessonDocument; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void; onJump: (diagram: DiagramLink) => void; containerRef: RefObject<HTMLElement | null>; interactiveData?: Map<string, BlockInteractiveData>; onInteractiveMove?: (fen: string) => void }) {
-  return <article ref={containerRef} className="narrative" aria-label={`Complete ${lesson.title} source text`}>
-    {lesson.blocks.map((block, index) => {
-      const previousSpan = lesson.blocks[index - 1]?.sourceSpanId;
-      const region = block.sourceSpanId !== previousSpan ? <SourceRegion lesson={lesson} spanId={block.sourceSpanId} /> : null;
-      const item = overlay.items[block.id];
-      const text = item?.decision === "accepted" && item.correctedText !== undefined ? item.correctedText : "text" in block ? block.text : "";
-      const blockInteractive = interactiveData?.get(block.id);
-      const renderInteractive = blockInteractive && onInteractiveMove;
-      const textRichText = (text: string, refs?: MoveReference[]) => renderInteractive
-        ? <InteractiveRichText text={text} entries={blockInteractive.entries} onMove={onInteractiveMove} />
-        : <RichText lesson={lesson} text={text} refs={refs} overlay={overlay} onMove={onMove} />;
-      let content: ReactNode;
-      if (block.type === "heading") content = <h2 className="source-heading">{textRichText(text, block.moveRefs)}</h2>;
-      else if (block.type === "diagram") {
-        const diagram = diagramById(lesson, block.diagramId);
-        content = <DiagramCard diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />;
-      } else if (block.type === "variation") {
-        const diagram = block.diagramId ? diagramById(lesson, block.diagramId) : null;
-        content = <details open className="variation-card"><summary><span>Source variation</span><strong>{block.title}</strong></summary><div className="variation-body"><p>{textRichText(text, block.moveRefs)}</p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />}</div></details>;
-      } else if (block.type === "move-sequence") content = <div className="main-move-block">{textRichText(text, block.moveRefs)}</div>;
-      else if (block.type === "assessment") content = <blockquote className="final-assessment">{textRichText(text, block.moveRefs)}</blockquote>;
-      else content = <p className="lesson-prose">{textRichText(text, block.moveRefs)}</p>;
-      return <div className="narrative-block" data-block-id={block.id} key={block.id}>{region}{content}</div>;
-    })}
-  </article>;
-});
 
 function EvaluationRail({ score, flipped }: { score: EngineScore | null; flipped: boolean }) {
-  const whiteFraction = scoreToWhiteFraction(score);
-  const whitePercent = (whiteFraction ?? 0.5) * 100;
+  const whitePercent = (scoreToWhiteFraction(score) ?? 0.5) * 100;
   const blackPercent = 100 - whitePercent;
   const segments = flipped
     ? [{ side: "white", height: whitePercent }, { side: "black", height: blackPercent }]
     : [{ side: "black", height: blackPercent }, { side: "white", height: whitePercent }];
-  return <div className="evaluation-rail" role="img" aria-label={score ? "Engine evaluation" : "Neutral engine evaluation, equal split"} data-orientation={flipped ? "flipped" : "normal"}>
-    <div className="evaluation-segments" aria-hidden="true">{segments.map((segment) => <div key={segment.side} className={`evaluation-segment ${segment.side}`} style={{ height: `${segment.height}%` }} />)}</div>
+  return <div className="evaluation-rail" role="img" aria-label={score ? "Engine evaluation" : "Neutral engine evaluation"}>
+    <div className="evaluation-segments" aria-hidden="true">{segments.map((segment) => <div className={`evaluation-segment ${segment.side}`} style={{ height: `${segment.height}%` }} key={segment.side} />)}</div>
   </div>;
 }
 
-const INITIAL_ENGINE_PHASE: EnginePhase = "uninitialized";
+function initialNavigation(markdown: string): MoveNavigation {
+  const fen = extractFenBlocks(markdown)[0]?.fen ?? new Chess().fen();
+  return { steps: [{ fen, label: "Chapter start" }], index: 0 };
+}
 
-function LessonView({ config, overlay }: { config: ChapterConfig; overlay: ReviewOverlay }) {
-  const { lesson } = config;
-  const enableClickableMoves = INTERACTIVE_MOVE_CHAPTER_IDS.has(config.id);
-  const [active, setActive] = useState<ActivePosition>(config.defaultPosition);
+function PageControls({ page, pageNumber, pageCount, onChange }: { page: number; pageNumber: number; pageCount: number; onChange: (index: number) => void }) {
+  return <nav className="lesson-page-controls" aria-label={`Chapter page ${pageNumber}, ${page + 1} of ${pageCount}`}>
+    <button type="button" disabled={page === 0} onClick={() => onChange(page - 1)}>Previous</button>
+    <strong>Page {pageNumber} · {page + 1} of {pageCount}</strong>
+    <button type="button" disabled={page === pageCount - 1} onClick={() => onChange(page + 1)}>Next</button>
+  </nav>;
+}
+
+function LessonReader({ chapter }: { chapter: MarkdownChapter }) {
+  const start = useMemo(() => initialNavigation(chapter.pages[0]?.markdown ?? chapter.markdown), [chapter]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [navigation, setNavigation] = useState<MoveNavigation>(start);
   const [flipped, setFlipped] = useState(false);
-  const [selectedFen, setSelectedFen] = useState<string | null>(null);
-  const interactiveMoveData = useMemo(() => enableClickableMoves ? compileInteractiveMoves(lesson) : null, [enableClickableMoves, lesson]);
-  const position = useMemo(() => positionFor(lesson, active, overlay), [lesson, active, overlay]);
   const [analysisMoves, setAnalysisMoves] = useState<AnalysisMove[]>([]);
-  const displayedFen = selectedFen ?? (analysisMoves.length ? analysisMoves[analysisMoves.length - 1].fen : position.fen);
-  const lastAnalysisMove = analysisMoves.length ? analysisMoves[analysisMoves.length - 1] : null;
-  const [enginePhase, setEnginePhase] = useState<EnginePhase>(INITIAL_ENGINE_PHASE);
+  const [enginePhase, setEnginePhase] = useState<EnginePhase>("uninitialized");
   const [engineAnalysis, setEngineAnalysis] = useState<AnalysisUpdate | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [analysisRequested, setAnalysisRequested] = useState(false);
-  const engineClientRef = useRef<StockfishClient | null>(null);
-  const engineClientLoadRef = useRef<Promise<StockfishClient> | null>(null);
-  const engineUnsubscribeRef = useRef<(() => void) | null>(null);
-  const narrativeRef = useRef<HTMLElement | null>(null);
-  const currentFenRef = useRef(displayedFen);
+  const clientRef = useRef<StockfishClient | null>(null);
+  const clientLoadRef = useRef<Promise<StockfishClient> | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const currentFenRef = useRef(start.steps[0].fen);
   const analysisRequestedRef = useRef(false);
-  const expectedSearchIdRef = useRef<number | null>(null);
-  const analysisRequestTokenRef = useRef(0);
-  const enginePhaseRef = useRef<EnginePhase>(INITIAL_ENGINE_PHASE);
-  const mountedRef = useRef(true);
-  const setActivePosition = useCallback((value: ActivePosition | ((current: ActivePosition) => ActivePosition)) => {
-    setEngineAnalysis(null);
+
+  const currentStep = navigation.steps[navigation.index] ?? navigation.steps[0];
+  const lastAnalysisMove = analysisMoves.at(-1) ?? null;
+  const displayedFen = lastAnalysisMove?.fen ?? currentStep.fen;
+  const visibleAnalysis = engineAnalysis?.fen === displayedFen ? engineAnalysis : null;
+  const currentPage = chapter.pages[pageIndex] ?? chapter.pages[0];
+
+  const selectNavigation = useCallback((next: MoveNavigation) => {
+    setNavigation(next);
     setAnalysisMoves([]);
-    setActive(value);
-    setSelectedFen(null);
+    setEngineAnalysis(null);
   }, []);
+
+  const moveWithinLine = useCallback((index: number) => {
+    setNavigation((current) => ({ ...current, index: Math.max(0, Math.min(index, current.steps.length - 1)) }));
+    setAnalysisMoves([]);
+    setEngineAnalysis(null);
+  }, []);
+
+  const selectPage = useCallback((nextIndex: number) => {
+    const clamped = Math.max(0, Math.min(nextIndex, chapter.pages.length - 1));
+    const page = chapter.pages[clamped];
+    if (!page) return;
+    setPageIndex(clamped);
+    setNavigation(initialNavigation(page.markdown));
+    setAnalysisMoves([]);
+    setEngineAnalysis(null);
+  }, [chapter.pages]);
+
   const applyAnalysisMove = useCallback((input: BoardMoveInput) => {
     const move = playAnalysisMove(displayedFen, input);
     if (!move) return;
     setEngineAnalysis(null);
-    setEngineError(null);
     setAnalysisMoves((current) => [...current, move]);
   }, [displayedFen]);
-  const undoAnalysisMove = () => {
-    setEngineAnalysis(null);
-    setAnalysisMoves((current) => current.slice(0, -1));
-  };
-  const resetAnalysis = () => {
-    setEngineAnalysis(null);
-    setAnalysisMoves([]);
-  };
-  const selectMove = useCallback((lineId: string, moveIndex: number) => {
-    setActivePosition({ lineId, ply: localMovePly(lesson, lineId, moveIndex) });
-  }, [lesson, setActivePosition]);
-  const jumpDiagram = useCallback((diagram: DiagramLink) => {
-    if (diagram.lineId === null || diagram.moveIndex === null) setActivePosition(config.defaultPosition);
-    else selectMove(diagram.lineId, diagram.moveIndex);
-  }, [config.defaultPosition, selectMove, setActivePosition]);
-  const handleInteractiveMove = useCallback((fen: string) => {
-    setSelectedFen(fen);
-  }, []);
 
-  const setEngineFailure = useCallback((error: unknown) => {
-    if (!mountedRef.current) return;
-    analysisRequestedRef.current = false;
-    expectedSearchIdRef.current = null;
-    analysisRequestTokenRef.current += 1;
-    enginePhaseRef.current = "error";
-    setAnalysisRequested(false);
-    setEnginePhase("error");
-    setEngineAnalysis(null);
-    setEngineError(error instanceof Error ? error.message : "Stockfish could not analyze this position.");
-  }, []);
-
-  const ensureEngineClient = useCallback(async () => {
-    if (engineClientRef.current) return engineClientRef.current;
-    if (engineClientLoadRef.current) return engineClientLoadRef.current;
-    const load = import("./stockfish-client").then(({ StockfishClient: Client }) => {
-      if (!mountedRef.current) throw new Error("Stockfish loading was cancelled.");
+  const ensureEngine = useCallback(async () => {
+    if (clientRef.current) return clientRef.current;
+    if (clientLoadRef.current) return clientLoadRef.current;
+    const loading = import("./stockfish-client").then(({ StockfishClient: Client }) => {
       const client = new Client();
-      const unsubscribe = client.subscribe((event: StockfishEvent) => {
-        if (!mountedRef.current) return;
-        const previousPhase = enginePhaseRef.current;
-        const displayPhase = event.phase === "uninitialized" && analysisRequestedRef.current ? "loading" : event.phase;
-        enginePhaseRef.current = displayPhase;
-        setEnginePhase(displayPhase);
-        if (event.phase === "error") {
-          analysisRequestedRef.current = false;
-          setAnalysisRequested(false);
-          setEngineAnalysis(null);
-          setEngineError(event.error ?? "Stockfish failed to load.");
-          return;
-        }
+      unsubscribeRef.current = client.subscribe((event: StockfishEvent) => {
+        setEnginePhase(event.phase);
         setEngineError(event.error);
-        const matchesDisplayedSearch = event.analysis
-          && event.analysis.fen === currentFenRef.current
-          && event.analysis.searchId === expectedSearchIdRef.current;
-        setEngineAnalysis(matchesDisplayedSearch ? event.analysis : null);
-        if (previousPhase === "searching" && event.phase === "ready" && analysisRequestedRef.current) {
+        if (event.analysis?.fen === currentFenRef.current) setEngineAnalysis(event.analysis);
+        if (event.phase === "error") {
           analysisRequestedRef.current = false;
           setAnalysisRequested(false);
         }
       });
-      engineClientRef.current = client;
-      engineUnsubscribeRef.current = unsubscribe;
+      clientRef.current = client;
       return client;
-    }).finally(() => {
-      engineClientLoadRef.current = null;
-    });
-    engineClientLoadRef.current = load;
-    return load;
+    }).finally(() => { clientLoadRef.current = null; });
+    clientLoadRef.current = loading;
+    return loading;
   }, []);
 
-  const requestAnalysis = useCallback((client: StockfishClient, fen: string) => {
-    const requestToken = ++analysisRequestTokenRef.current;
-    expectedSearchIdRef.current = null;
-    void client.analyze(fen).then((searchId) => {
-      if (!mountedRef.current || requestToken !== analysisRequestTokenRef.current || currentFenRef.current !== fen || !analysisRequestedRef.current) return;
-      expectedSearchIdRef.current = searchId;
-      const current = client.getSnapshot().analysis;
-      if (current?.searchId === searchId && current.fen === fen) setEngineAnalysis(current);
-    }).catch(setEngineFailure);
-  }, [setEngineFailure]);
-
-  const toggleAnalysis = async () => {
-    if (enginePhase === "loading" || enginePhase === "stopping" || enginePhase === "restarting" || enginePhase === "error") return;
-    if (analysisRequestedRef.current || enginePhase === "searching") {
+  const toggleAnalysis = useCallback(async () => {
+    if (analysisRequestedRef.current || enginePhase === "searching" || enginePhase === "restarting") {
       analysisRequestedRef.current = false;
-      analysisRequestTokenRef.current += 1;
       setAnalysisRequested(false);
-      if (engineClientRef.current) void engineClientRef.current.stop().catch(setEngineFailure);
+      await clientRef.current?.stop();
       return;
     }
     analysisRequestedRef.current = true;
-    enginePhaseRef.current = "loading";
     setAnalysisRequested(true);
-    setEnginePhase("loading");
-    setEngineAnalysis(null);
     setEngineError(null);
     try {
-      const client = await ensureEngineClient();
-      if (!mountedRef.current || !analysisRequestedRef.current) return;
-      requestAnalysis(client, currentFenRef.current);
+      const client = await ensureEngine();
+      if (analysisRequestedRef.current) await client.analyze(currentFenRef.current);
     } catch (error) {
-      setEngineFailure(error);
+      analysisRequestedRef.current = false;
+      setAnalysisRequested(false);
+      setEnginePhase("error");
+      setEngineError(error instanceof Error ? error.message : "Stockfish could not analyze this position.");
     }
-  };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      if (event.key === "ArrowRight") { setSelectedFen(null); setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId).length, value.ply + 1) })); }
-      if (event.key === "ArrowLeft") { setSelectedFen(null); setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) })); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [lesson, setActivePosition]);
-
-  useEffect(() => {
-    const root = narrativeRef.current;
-    if (!root) return;
-    root.querySelectorAll<HTMLElement>(".inline-move.active").forEach((element) => {
-      element.classList.remove("active");
-      element.removeAttribute("aria-current");
-    });
-    const activeMoveId = position.activeMove?.id;
-    if (!activeMoveId) return;
-    root.querySelectorAll<HTMLElement>(`[data-move-id="${CSS.escape(activeMoveId)}"]`).forEach((element) => {
-      element.classList.add("active");
-      element.setAttribute("aria-current", "true");
-    });
-  }, [overlay, position.activeMove?.id]);
+  }, [enginePhase, ensureEngine]);
 
   useEffect(() => {
     currentFenRef.current = displayedFen;
-    if (analysisRequestedRef.current && engineClientRef.current) {
-      requestAnalysis(engineClientRef.current, displayedFen);
-    } else {
-      expectedSearchIdRef.current = null;
+    if (analysisRequestedRef.current && clientRef.current) {
+      setEngineAnalysis(null);
+      void clientRef.current.analyze(displayedFen).catch((error) => setEngineError(error instanceof Error ? error.message : String(error)));
     }
-  }, [displayedFen, requestAnalysis]);
+  }, [displayedFen]);
 
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      engineUnsubscribeRef.current?.();
-      engineUnsubscribeRef.current = null;
-      engineClientRef.current?.dispose();
-      engineClientRef.current = null;
-      engineClientLoadRef.current = null;
-      expectedSearchIdRef.current = null;
-      analysisRequestTokenRef.current += 1;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+      if (event.key === "ArrowLeft") moveWithinLine(navigation.index - 1);
+      if (event.key === "ArrowRight") moveWithinLine(navigation.index + 1);
     };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [moveWithinLine, navigation.index]);
+
+  useEffect(() => () => {
+    unsubscribeRef.current?.();
+    clientRef.current?.dispose();
+    unsubscribeRef.current = null;
+    clientRef.current = null;
   }, []);
 
-  const activeIndex = active.ply - 1;
-  const start = new Chess(lineStartFen(lesson, lineById(lesson, active.lineId)));
-  const [, turn, , , , fullmove] = start.fen().split(" ");
-  const halfMove = (turn === "b" ? 1 : 0) + Math.max(activeIndex, 0);
-  const moveNumber = Number(fullmove) + Math.floor(halfMove / 2);
-  const moveLabel = lastAnalysisMove?.label ?? (position.activeMove ? `${moveNumber}${halfMove % 2 === 0 ? "." : "..."}${effectiveSan(position.activeMove, overlay)}` : (lineById(lesson, active.lineId).startLabel ?? "Line start"));
-  // A retained result is visible only after the FEN ref catches up with the
-  // rendered position. Navigation therefore blanks the old PV immediately,
-  // while Stop keeps it visible for the unchanged position.
-  const visibleAnalysis = engineAnalysis?.fen === displayedFen ? engineAnalysis : null;
-  // Keep the last valid PV visible while Stockfish is stopping or ready. A
-  // new search and FEN navigation clear the retained update above.
-  const showPv = visibleAnalysis !== null;
-  const pvOutput = showPv
-    ? [`Depth ${visibleAnalysis.depth ?? "—"}`, visibleAnalysis.score?.label ?? "—", visibleAnalysis.formattedPv].filter(Boolean).join(" · ")
-    : "";
-  const analysisTransition = enginePhase === "loading" || enginePhase === "stopping" || enginePhase === "restarting" || (analysisRequested && enginePhase === "ready");
-  const analysisButtonLabel = enginePhase === "loading" || (analysisRequested && enginePhase === "ready")
+  const analysisButtonLabel = enginePhase === "loading"
     ? "Loading engine…"
     : enginePhase === "stopping"
       ? "Stopping…"
-      : enginePhase === "restarting"
-        ? "Restarting…"
-        : enginePhase === "searching"
-          ? "Stop"
-          : "Analyze";
+      : analysisRequested
+        ? "Stop"
+        : "Analyze";
+  const pvOutput = visibleAnalysis
+    ? [`Depth ${visibleAnalysis.depth ?? "—"}`, visibleAnalysis.score?.label ?? "—", visibleAnalysis.formattedPv].filter(Boolean).join(" · ")
+    : "";
+
   return <main className="view lesson-reader">
-    <h1 className="sr-only">{lesson.title}</h1>
     <section className="guided-layout">
       <aside className="sticky-board">
         <div className="analysis-pv" aria-label="Stockfish principal variation"><span className="analysis-pv-output">{pvOutput}</span></div>
@@ -672,125 +178,60 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
         </div></div>
         <div className="board-controls" aria-label="Chessboard controls">
           <div className="board-nav-controls">
-            <button onClick={() => setActivePosition((value) => ({ ...value, ply: 0 }))} aria-label="Go to line start">|‹</button>
-            <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }))} aria-label="Previous move">‹</button>
-            <span>{moveLabel}</span>
-            <button onClick={() => setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId).length, value.ply + 1) }))} aria-label="Next move">›</button>
-            <button onClick={() => setActivePosition((value) => ({ ...value, ply: linePath(lesson, value.lineId).length }))} aria-label="Go to line end">›|</button>
+            <button onClick={() => moveWithinLine(0)} aria-label="Go to line start">|‹</button>
+            <button onClick={() => moveWithinLine(navigation.index - 1)} aria-label="Previous move">‹</button>
+            <span>{lastAnalysisMove?.label ?? currentStep.label}</span>
+            <button onClick={() => moveWithinLine(navigation.index + 1)} aria-label="Next move">›</button>
+            <button onClick={() => moveWithinLine(navigation.steps.length - 1)} aria-label="Go to line end">›|</button>
           </div>
           {analysisMoves.length > 0 && <div className="analysis-branch-controls" aria-label="Analysis branch controls">
             <span>Analysis branch · {analysisMoves.length} {analysisMoves.length === 1 ? "ply" : "plies"}</span>
-            <div><button onClick={undoAnalysisMove} aria-label="Undo analysis move">Undo</button><button onClick={resetAnalysis} aria-label="Reset analysis to lesson position">Reset</button></div>
+            <div><button onClick={() => setAnalysisMoves((current) => current.slice(0, -1))}>Undo</button><button onClick={() => setAnalysisMoves([])}>Reset</button></div>
           </div>}
           <div className="board-action-controls">
-            <button className="analysis-button" onClick={toggleAnalysis} aria-label={enginePhase === "searching" ? "Stop Stockfish analysis" : "Analyze current position with Stockfish"} aria-pressed={analysisRequested} disabled={analysisTransition || enginePhase === "error"}>{analysisButtonLabel}</button>
-            <button className="flip-button" onClick={() => setFlipped((value) => !value)} aria-label="Flip board">↻ Flip</button>
+            <button className="analysis-button" onClick={toggleAnalysis} disabled={enginePhase === "stopping" || enginePhase === "error"} aria-pressed={analysisRequested}>{analysisButtonLabel}</button>
+            <button className="flip-button" onClick={() => setFlipped((current) => !current)} aria-label="Flip board">↻ Flip</button>
           </div>
           {engineError && <p className="analysis-error" role="alert">{engineError}</p>}
         </div>
-        <div className="active-line"><span>{analysisMoves.length ? "Analysis from" : "Active line"}</span><strong>{lineById(lesson, active.lineId).label}</strong>{analysisMoves.length > 0 && <small>{analysisMoves.length} exploratory {analysisMoves.length === 1 ? "move" : "moves"}; lesson source remains unchanged.</small>}{!position.valid && <small>Manual SAN correction is not legal; showing verified baseline position.</small>}</div>
+        <div className="active-line"><span>{analysisMoves.length ? "Analysis from" : "Markdown line"}</span><strong>{currentStep.label}</strong><small>{navigation.steps.length - 1} navigable {navigation.steps.length === 2 ? "move" : "moves"} in this line</small></div>
       </aside>
-      {MARKDOWN_CHAPTER_IDS.has(config.id)
-        ? <MarkdownChapterView chapterId={config.id} onMove={handleInteractiveMove} />
-        : <Narrative lesson={lesson} overlay={overlay} onMove={selectMove} onJump={jumpDiagram} containerRef={narrativeRef} interactiveData={interactiveMoveData ?? undefined} onInteractiveMove={handleInteractiveMove} />}
+      <section className="lesson-page-column" aria-label={`Chapter ${chapter.chapterNumber}, page ${currentPage?.number ?? pageIndex + 1}`}>
+        <PageControls page={pageIndex} pageNumber={currentPage?.number ?? pageIndex + 1} pageCount={chapter.pages.length} onChange={selectPage} />
+        <MarkdownChapterView markdown={currentPage?.markdown ?? chapter.markdown} onMove={selectNavigation} />
+        <PageControls page={pageIndex} pageNumber={currentPage?.number ?? pageIndex + 1} pageCount={chapter.pages.length} onChange={selectPage} />
+      </section>
     </section>
   </main>;
 }
 
-function ReviewView({ config, overlay, setOverlay }: { config: ChapterConfig; overlay: ReviewOverlay; setOverlay: (overlay: ReviewOverlay) => void }) {
-  const { lesson } = config;
-  const [tab, setTab] = useState<ReviewTab>("text");
-  const updateItem = (id: string, patch: Partial<ReviewItem>) => setOverlay({ ...overlay, items: { ...overlay.items, [id]: { ...(overlay.items[id] ?? { decision: "pending" as const }), ...patch } } });
-  const textBlocks = lesson.blocks.filter((block) => "text" in block && block.type !== "heading");
-  const annotatedMoves = config.annotatedMoveIds.map((id) => lesson.lines.flatMap((line) => line.moves).find((move) => move.id === id)).filter(Boolean) as VariationMove[];
-  return <main className="view editor-view">
-    <section className="page-heading"><div><p className="eyebrow">Editor mode · {config.label}</p><h1>Source review</h1><p className="lede">Review stable lesson entities. Accepted corrections form a separate local overlay and are never written over imported evidence.</p></div><span className="autosave">● Saved locally</span></section>
-    {overlay.legacyTextReview && <div className="legacy-notice"><strong>Legacy review preserved</strong><p>The earlier partial transcription was archived and was not applied over the new complete source text.</p></div>}
-    <div className="review-tabs"><button className={tab === "text" ? "active" : ""} onClick={() => setTab("text")}>Text · {textBlocks.length}</button><button className={tab === "moves" ? "active" : ""} onClick={() => setTab("moves")}>Moves · {annotatedMoves.length}</button><button className={tab === "boards" ? "active" : ""} onClick={() => setTab("boards")}>Boards · {lesson.diagrams.length}</button></div>
-    {tab === "text" && <div className="review-list">{textBlocks.map((block) => {
-      const item = overlay.items[block.id] ?? { decision: "pending" as const };
-      const span = spanById(lesson, block.sourceSpanId);
-      return <article className="review-card" key={block.id}><div className="review-card-meta"><span>{block.id}</span><strong>Page {span.printedPage} · {span.column}</strong><details><summary>View crop</summary><img loading="lazy" decoding="async" src={span.crop} alt={`Source crop for ${block.id}`} /></details></div><div><label>Source-verified text<textarea rows={Math.max(3, Math.ceil(block.text.length / 85))} value={item.correctedText ?? block.text} onChange={(event) => updateItem(block.id, { correctedText: event.target.value })} /></label><Decision value={item.decision} onChange={(decision) => updateItem(block.id, { decision })} /></div></article>;
-    })}</div>}
-    {tab === "moves" && <div className="review-list">{annotatedMoves.map((move) => {
-      const item = overlay.items[move.id] ?? { decision: "pending" as const };
-      return <article className="review-card compact-card" key={move.id}><div className="review-card-meta"><span>{move.id}</span><strong>{move.sourceToken}</strong><small>Canonical and annotations are separate fields.</small></div><div><div className="move-editor-grid"><label>Canonical SAN<input value={item.correctedSan ?? move.san} onChange={(event) => updateItem(move.id, { correctedSan: event.target.value })} /></label><label>Source token<input value={item.sourceToken ?? move.sourceToken} onChange={(event) => updateItem(move.id, { sourceToken: event.target.value })} /></label><label>Punctuation<input value={item.punctuation ?? move.annotation?.punctuation ?? ""} onChange={(event) => updateItem(move.id, { punctuation: event.target.value })} /></label><label>Novelty<input value={item.novelty ?? move.annotation?.novelty ?? ""} onChange={(event) => updateItem(move.id, { novelty: event.target.value })} /></label><label>Evaluation<input value={item.evaluation ?? move.annotation?.evaluation ?? ""} onChange={(event) => updateItem(move.id, { evaluation: event.target.value })} /></label></div><Decision value={item.decision} onChange={(decision) => updateItem(move.id, { decision })} /></div></article>;
-    })}</div>}
-    {tab === "boards" && <div className="review-list">{lesson.diagrams.map((diagram) => {
-      const item = overlay.items[diagram.id] ?? { decision: "pending" as const, confidence: "unreviewed" as const };
-      const fen = item.correctedFen ?? diagram.fen;
-      let valid = true; try { new Chess(fen); } catch { valid = false; }
-      return <article className="review-card board-review" key={diagram.id}><div className="review-card-meta"><span>{diagram.id} · printed source</span><img loading="lazy" decoding="async" src={diagram.crop} alt={`${diagram.id} source diagram`} /></div><div className="board-review-body"><div className="mini-board"><Chessboard fen={valid ? fen : diagram.fen} /></div><div><h2>{diagram.role}</h2><p className="status-line">Association: {diagram.associationStatus} · Position: {diagram.positionStatus} · Identity: {diagram.boardIdentityStatus}</p><label>Candidate FEN<input className={!valid ? "invalid" : ""} value={fen} onChange={(event) => updateItem(diagram.id, { correctedFen: event.target.value })} /></label><label>Comparison confidence<select value={item.confidence ?? "unreviewed"} onChange={(event) => updateItem(diagram.id, { confidence: event.target.value as ReviewItem["confidence"] })}><option>unreviewed</option><option>visually plausible</option><option>manually confirmed</option></select></label><label>Reviewer note<textarea rows={2} value={item.note ?? ""} onChange={(event) => updateItem(diagram.id, { note: event.target.value })} /></label><p className={valid ? "validity valid" : "validity invalid-text"}>{valid ? "✓ Legal FEN syntax" : "Invalid FEN - correction required"}</p><Decision value={item.decision} onChange={(decision) => updateItem(diagram.id, { decision })} /></div></div></article>;
-    })}</div>}
-  </main>;
-}
-
-function ImportView({ config, overlay }: { config: ChapterConfig; overlay: ReviewOverlay }) {
-  const { lesson } = config;
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<SourceVerificationResult | null>(null);
-  const preservedCorrections = Object.values(overlay.items).filter((item) => item.decision === "accepted").length;
-  const compareLesson = async (sourceHash: string, extractedRegionCount: number, scope: SourceVerificationResult["scope"]): Promise<SourceVerificationResult> => {
-    const canonicalLessonHash = await sha256(canonicalize(lesson));
-    const matches = !config.importDefinition.expectedCanonicalHash || canonicalLessonHash === config.importDefinition.expectedCanonicalHash;
-    return { status: matches ? "verified" : "review_required", scope, sourceHash, canonicalLessonHash, checksPassed: matches ? (scope === "uploaded_pdf" ? 3 : 1) : 0, preservedCorrections, extractedRegionCount, message: matches ? (scope === "uploaded_pdf" ? "The PDF hash, declared source regions, and packaged lesson snapshot are verified. Review corrections remain separate and preserved." : "The packaged canonical lesson snapshot matches its verified baseline. No PDF was read during this check.") : "The packaged canonical lesson differs from its verified baseline. Nothing was overwritten." };
-  };
-  const runBundled = async () => {
-    setRunning(true); setResult(null);
-    try { setResult(await compareLesson(lesson.source.sha256, 0, "canonical_snapshot")); }
-    finally { setRunning(false); }
-  };
-  const checkPdf = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; if (!file) return;
-    setRunning(true); setResult(null);
-    try {
-      const bytes = await file.arrayBuffer();
-      const sourceHash = await sha256(bytes);
-      if (sourceHash !== lesson.source.sha256) {
-        setResult({ status: "rejected", scope: "uploaded_pdf", sourceHash, canonicalLessonHash: "not generated", checksPassed: 0, preservedCorrections, extractedRegionCount: 0, message: `This PDF does not match the verified ${config.importDefinition.filename}. No lesson or review data was changed.` });
-      } else {
-        const { extractLessonRegions } = await import("./pdf-import");
-        const regions = await extractLessonRegions(bytes, lesson, config.importDefinition.regions);
-        setResult(await compareLesson(sourceHash, regions.length, "uploaded_pdf"));
-      }
-    } catch (error) {
-      setResult({ status: "review_required", scope: "uploaded_pdf", sourceHash: lesson.source.sha256, canonicalLessonHash: "not generated", checksPassed: 0, preservedCorrections, extractedRegionCount: 0, message: error instanceof Error ? error.message : "The PDF regions could not be extracted. Nothing was overwritten." });
-    } finally { setRunning(false); event.target.value = ""; }
-  };
-  return <main className="view editor-view"><section className="page-heading"><div><p className="eyebrow">Editor mode · source verification</p><h1>Verify {config.label}</h1><p className="lede">Verify the packaged canonical snapshot or inspect the exact source PDF without generating or overwriting lesson content.</p></div></section><section className="import-card"><div className="import-mark">↧</div><h2>Verify packaged lesson snapshot</h2><p>Checks the canonical lesson hash. The authoritative PDF check uses the {config.importDefinition.scopeLabel} below.</p><button className="primary-button" onClick={runBundled} disabled={running}>{running ? "Verifying..." : "Verify canonical snapshot"}</button><div className="or"><span>or</span></div><label className="file-button">Verify {config.importDefinition.filename}<input type="file" accept="application/pdf" onChange={checkPdf} /></label></section>{result && <section className={`import-result ${result.status}`}><div className="result-icon">{result.status === "verified" ? "✓" : "!"}</div><div><p className="eyebrow">Verification result</p><h2>{result.status}</h2><p>{result.message}</p><dl><div><dt>Verification scope</dt><dd>{result.scope}</dd></div><div><dt>Checks passed</dt><dd>{result.checksPassed}</dd></div><div><dt>Extracted regions</dt><dd>{result.extractedRegionCount}</dd></div><div><dt>Corrections preserved</dt><dd>{result.preservedCorrections}</dd></div><div><dt>Canonical lesson hash</dt><dd>{result.canonicalLessonHash}</dd></div></dl></div></section>}</main>;
-}
-
-export default function CatalanApp({ config, chapters, initialView = "lesson" }: { config: ChapterConfig; chapters: readonly ChapterSummary[]; initialView?: View }) {
+export default function CatalanApp({ chapter, chapters }: { chapter: MarkdownChapter; chapters: readonly ChapterSummary[] }) {
   const router = useRouter();
-  const [view, setView] = useState<View>(initialView);
-  const [overlay, setOverlayState] = useState<ReviewOverlay>(emptyOverlay(config));
-  const [editorMode, setEditorMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chapterTarget, setChapterTarget] = useState<ChapterSummary>();
   const [, startChapterTransition] = useTransition();
-  useEffect(() => {
-    const hydrationTask = window.setTimeout(() => {
-      setOverlayState(migrateReview(config));
-      setEditorMode(localStorage.getItem(EDITOR_KEY) === "true");
-    }, 0);
-    return () => window.clearTimeout(hydrationTask);
-  }, [config]);
-  const setOverlay = (value: ReviewOverlay) => { setOverlayState(value); localStorage.setItem(config.reviewKey, JSON.stringify(value)); };
-  const toggleEditor = () => { const next = !editorMode; setEditorMode(next); localStorage.setItem(EDITOR_KEY, String(next)); if (!next) setView("lesson"); };
-  const navigate = (next: View) => { setView(next); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const navigateChapter = (event: MouseEvent<HTMLAnchorElement>, chapter: ChapterSummary) => {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || chapter.id === config.id) return;
+
+  const navigateChapter = (event: MouseEvent<HTMLAnchorElement>, target: ChapterSummary) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || target.id === chapter.id) return;
     event.preventDefault();
     setMenuOpen(false);
-    setChapterTarget(chapter);
-    window.setTimeout(() => startChapterTransition(() => router.push(`/chapters/${chapter.id}`)), CHAPTER_NAVIGATION_PAINT_DELAY_MS);
+    setChapterTarget(target);
+    window.setTimeout(() => startChapterTransition(() => router.push(`/chapters/${target.id}`)), CHAPTER_NAVIGATION_PAINT_DELAY_MS);
   };
+
   return <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-    <header className="topbar"><button className="sidebar-toggle desktop-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Show navigation" : "Hide navigation"} aria-expanded={!sidebarCollapsed} aria-controls="course-sidebar">☰</button><button className="sidebar-toggle menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="course-sidebar">☰</button><button className="brand" onClick={() => navigate("lesson")}><span className="brand-mark">C</span><span><strong>Catalan Atelier</strong><small>{config.label}</small></span></button></header>
-    <aside id="course-sidebar" className={`sidebar ${menuOpen ? "open" : ""}`}><nav><p>Course</p>{chapters.map((chapter) => <a className={`course-link ${chapter.id === config.id ? "active" : ""}`} href={`/chapters/${chapter.id}`} onClick={(event) => navigateChapter(event, chapter)} key={chapter.id}><span className="nav-glyph">{chapter.id}</span><span>{chapter.label}</span></a>)}{editorMode && <><p className="editor-nav-label">Editor tools</p><a className={view === "review" ? "active" : ""} href={`/chapters/${config.id}/review`}><span className="nav-glyph">R</span><span>Source review</span></a><a className={view === "import" ? "active" : ""} href={`/chapters/${config.id}/import`}><span className="nav-glyph">V</span><span>Verify source</span></a></>}</nav><div className="sidebar-footer"><div className="source-card"><span>Verified source</span><strong>{config.importDefinition.filename}</strong><small>SHA-256 · {config.importDefinition.sourceHash.slice(0, 4)}...{config.importDefinition.sourceHash.slice(-4)}</small></div><button className={`editor-toggle ${editorMode ? "on" : ""}`} onClick={toggleEditor} role="switch" aria-checked={editorMode}><span className="toggle-track"><i /></span><strong>Editor mode</strong></button></div></aside>
+    <header className="topbar">
+      <button className="sidebar-toggle desktop-sidebar-toggle" onClick={() => setSidebarCollapsed((current) => !current)} aria-label={sidebarCollapsed ? "Show navigation" : "Hide navigation"}>☰</button>
+      <button className="sidebar-toggle menu-button" onClick={() => setMenuOpen((current) => !current)} aria-label="Toggle navigation">☰</button>
+      <a className="brand" href={`/chapters/${chapter.id}`}><span className="brand-mark">C</span><span><strong>Catalan Atelier</strong><small>Chapter {chapter.chapterNumber}</small></span></a>
+    </header>
+    <aside id="course-sidebar" className={`sidebar ${menuOpen ? "open" : ""}`}>
+      <nav><p>Course</p>{chapters.map((summary) => <a className={`course-link ${summary.id === chapter.id ? "active" : ""}`} href={`/chapters/${summary.id}`} onClick={(event) => navigateChapter(event, summary)} key={summary.id}><span className="nav-glyph">{summary.id}</span><span>{summary.label}</span></a>)}</nav>
+      <div className="sidebar-footer"><div className="source-card"><span>Lesson source</span><strong>Pre-authored Markdown</strong><small>PDFs are optional external references for accuracy checks.</small></div></div>
+    </aside>
     {menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
-    <div className="content">{view === "lesson" ? <LessonView config={config} overlay={overlay} /> : view === "review" && editorMode ? <ReviewView config={config} overlay={overlay} setOverlay={setOverlay} /> : view === "import" && editorMode ? <ImportView config={config} overlay={overlay} /> : <LessonView config={config} overlay={overlay} />}</div>
-    {chapterTarget && chapterTarget.id !== config.id && <LessonLoading label={`Loading ${chapterTarget.label}…`} overlay />}
+    <div className="content"><LessonReader chapter={chapter} key={chapter.id} /></div>
+    {chapterTarget && chapterTarget.id !== chapter.id && <LessonLoading label={`Loading ${chapterTarget.label}…`} overlay />}
   </div>;
 }

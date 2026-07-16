@@ -1,6 +1,8 @@
 # Catalan Atelier app
 
-A read-only chess opening reader for Catalan B2 vertical variations. Chapters are authored as Markdown files in `app/content/chapters/` and discovered at build time via Vite's `import.meta.glob`. Each chapter includes annotated pages, FEN positions, and interactive chessboards with Stockfish analysis.
+A Markdown-first chess opening reader. Chapters are authored in `app/content/chapters/` and rendered with legal move navigation, FEN diagrams, an exploratory board, and optional Stockfish analysis.
+
+PDFs may be used outside the app as transcription references. The runtime does not parse or convert them.
 
 ## Development
 
@@ -9,17 +11,19 @@ npm install
 npm run dev
 ```
 
+## Chapter management
+
+```powershell
+npm run chapters:status
+npm run chapters:sync
+npm run chapters:check
+```
+
+Add a chapter by creating `app/content/chapters/chapter-N-catalan.md`; never add a chapter-specific route or navigation entry.
+
 ## Verification
 
 ```powershell
 npm test
+npm run lint
 ```
-
-Runs chapter system checks, TypeScript typecheck, Stockfish client tests, and chapter parser unit tests.
-
-## Chapter management
-
-- Add a new chapter: create `app/content/chapters/chapter-N-catalan.md` and regenerate the catalog
-- `npm run chapters:status` — list all published chapters
-- `npm run chapters:check` — full validation of all Markdown chapters (page count, FEN blocks, structure)
-- See `.agents/skills/add-catalan-chapter/SKILL.md` for the publication workflow

@@ -1,10 +1,16 @@
 export interface MarkdownChapter {
   id: string;
-  slug: string;
   chapterNumber: number;
-  order: number;
   title: string;
+  markdown: string;
   pages: MarkdownPage[];
+}
+
+export interface ChapterSummary {
+  id: string;
+  label: string;
+  title: string;
+  pageCount: number;
 }
 
 export interface MarkdownPage {
@@ -18,10 +24,9 @@ const PAGE_HEADING = /^## Page (\d+)\s*$/gm;
 export function parseChapter(filename: string, content: string): MarkdownChapter {
   const chapterNumber = extractChapterNumber(filename);
   const title = extractTitle(content, filename);
-  const slug = filename.replace(/\.md$/i, "").toLowerCase().replace(/\s+/g, "-");
-  const id = slug;
+  const id = String(chapterNumber);
   const pages = extractPages(content);
-  return { id, slug, chapterNumber, order: chapterNumber, title, pages };
+  return { id, chapterNumber, title, markdown: content, pages };
 }
 
 function extractChapterNumber(filename: string): number {
@@ -90,10 +95,10 @@ export function extractPages(content: string): MarkdownPage[] {
 
 export function extractFenBlocks(markdown: string): { fen: string; index: number }[] {
   const blocks: { fen: string; index: number }[] = [];
-  const regex = /\*\*FEN:\*\*\s*\n\s*`([^`]+)`/g;
+  const regex = /<!--\s*FEN:\s*([^>]+?)\s*-->|\*\*FEN:\*\*\s*\n\s*`([^`]+)`/g;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(markdown)) !== null) {
-    const fen = match[1].trim();
+    const fen = (match[1] ?? match[2]).trim();
     if (fen.split(" ").length >= 4) {
       blocks.push({ fen, index: match.index });
     }

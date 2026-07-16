@@ -16,18 +16,18 @@
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.0-0 Nc6  
 7.e3
 
-- A) 7...Nd5 — 135
-- B) 7...Rb8 8.Nfd2 — 136
-  - B1) 8...Qd7 — 136
-  - B2) 8...e5 9.Bxc6+ bxc6 10.dxe5 Ng4 11.Nxc4 Be6 12.Nbd2 — 138
-    - B21) 12...h5 — 139
-    - B22) 12...Bb4 — 139
-- C) 7...Bd7 8.Qe2 b5 9.b3!? cxb3 10.axb3 — 140
-  - C1) 10...Bb4 — 141
-  - C2) 10...Be7 — 141
-  - C3) 10...Bd6 11.Bb2 0-0 12.Rc1 — 143
-    - C31) 12...Nb4 — 144
-    - C32) 12...Nd5 — 144
+A) 7...Nd5 — 135  
+B) 7...Rb8 8.Nfd2 — 136  
+&nbsp;&nbsp;&nbsp;&nbsp;B1) 8...Qd7 — 136  
+&nbsp;&nbsp;&nbsp;&nbsp;B2) 8...e5 9.Bxc6+ bxc6 10.dxe5 Ng4 11.Nxc4 Be6 12.Nbd2 — 138  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B21) 12...h5 — 139  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B22) 12...Bb4 — 139  
+C) 7...Bd7 8.Qe2 b5 9.b3!? cxb3 10.axb3 — 140  
+&nbsp;&nbsp;&nbsp;&nbsp;C1) 10...Bb4 — 141  
+&nbsp;&nbsp;&nbsp;&nbsp;C2) 10...Be7 — 141  
+&nbsp;&nbsp;&nbsp;&nbsp;C3) 10...Bd6 11.Bb2 0-0 12.Rc1 — 143  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C31) 12...Nb4 — 144  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C32) 12...Nd5 — 144
 
 ---
 
@@ -569,8 +569,6 @@ White has regained the pawn, and can continue pressing with no risk.
 
 ## Page 12
 
-<!-- FEN: r2q1rk1/2pb1ppp/p1nbp3/1p1n4/3P4/1P2PNP1/1B2QPBP/RNR3K1 w - - 5 13 -->
-
 ### Chapter 10 – 5...a6 and 6...Nc6
 
 **145**
@@ -583,23 +581,15 @@ White does not mind exchanging pieces, as the removal of the d5-knight will help
 
 ### 13...Ncb4
 
-<!-- FEN: r2q1rk1/2pb1ppp/p1nbp3/1p1n4/3P4/1PN1PNP1/1B2QPBP/R1R3K1 b - - 6 13 -->
-
 **13...Nxc3?!N** is too compliant, and after **14.Bxc3** White’s initiative is quite potent. A sample line is: **14...Ne7 15.Ne5 Nd5 16.Ba5 Be8 17.Nd3 f5 18.Rc2** White has typical compensation, with an even better version than in some of the other lines given.
-
-<!-- FEN: r2q1rk1/2pb1ppp/p1nbp3/1p1n4/3P4/1PN1PNP1/1B2QPBP/R1R3K1 b - - 6 13 -->
 
 **13...Qe7 14.Ne4** The knight is heading for c5. **14...a5 15.Ne5 Ncb4** White has several interesting ideas here, but I prefer **16.Nc5 Bxe5 17.dxe5** with rich compensation, as in Foulds – Coyne, corr. 2014. White’s pieces are perfectly placed, and he has good chances to seize the initiative on the kingside.
 
-<!-- FEN: r2q1rk1/2pb1ppp/p2bp3/1p1n4/1n1P4/1PN1PNP1/1B2QPBP/R1R3K1 w - - 7 14 -->
-
 ### 14.Ne4 a5 15.Nc5 Bc6
-
-<!-- FEN: r2q1rk1/2pb1ppp/3bp3/ppNn4/1n1P4/1P2PNP1/1B2QPBP/R1R3K1 b - - 1 15 -->
 
 **15...Bxc5** is well met by **16.dxc5!∞**, opening a path for the dark-squared bishop, as in Tinjaca Ramirez – Sheretyuk, corr. 2013.
 
-**FEN:**
+**FEN:**  
 `r2q1rk1/2p2ppp/2bbp3/ppNn4/1n1P4/1P2PNP1/1B2QPBP/R1R3K1 w - - 2 16`
 
 ### 16.Ne5 Bxe5 17.dxe5
@@ -608,12 +598,9 @@ Again White’s compensation was obvious in Oppitz – Hirr, Internet 2011.
 
 ### Conclusion
 
-<!-- FEN: rnbqkb1r/ppp2ppp/4pn2/8/2pP4/5NP1/PP2PPBP/RNBQK2R b KQkq - 1 5 -->
-
 **5...a6 6.0-0 Nc6** is a challenging system, which is generally played with the intention of holding on to the c4-pawn. I recommend departing from *GM 1* with **7.e3**, when Black has two main options.
 
 **7...Rb8** leads to dynamic play after **8.Nfd2 e5 9.Bxc6+ bxc6 10.dxe5 Ng4 11.Nxc4 Be6 12.Nbd2**, when White has gone from being a pawn down to a pawn up, but has been forced to part with his important ‘Catalan bishop’. Black has some attacking prospects with **...h5-h4**, but my analysis indicates that White can keep control and steer the game towards favourable simplifications.
 
-<!-- FEN: r1bqkb1r/1pp2ppp/p1n1pn2/8/2pP4/4PNP1/PP3PBP/RNBQ1RK1 b kq - 0 7 -->
-
 **7...Bd7 8.Qe2 b5** sees Black firmly protecting his extra pawn on c4, so I like the straightforward plan of swapping it off with **9.b3!? cxb3 10.axb3**. White has long-term positional compensation and the black bishop is misplaced on d7. We analysed three moves for Black but, although some of the finer details vary from one line to the next, the general ideas remain similar. In all cases, White gets a lasting initiative with natural, easy-to-understand moves.
+
