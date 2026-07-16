@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "sourceBundleSha256": "1FF304FBD9D4AABC79950B41BF7050B315FC375E8B8DA0F0A944CC39404E93B9",
+  "method": "Square-template recognition trained on the verified Chapter 2-5 crop/FEN corpus, followed by material validation and visual crop review.",
+  "confirmed": [
+    "CH6-D29",
+    "CH6-D30",
+    "CH7-D71",
+    "CH7-D73",
+    "CH8-D02",
+    "CH8-D23"
+  ],
+  "overrides": {
+    "CH6-D29": "Q1b1k2r/p2q1ppp/4pn2/2b5/2p5/6P1/PP2PP1P/RNB2RK1 w - - 0 1",
+    "CH7-D71": "1r4k1/p1qb1ppp/4pn2/8/2r5/P3QBP1/1P2PP1P/R1B2RK1 w - - 0 1",
+    "CH7-D73": "3r2k1/p4ppp/5n2/1b2p3/1P6/P5P1/3BqPBP/2Q2RK1 w - - 0 1",
+    "CH8-D02": "Qn2qrk1/5ppp/5n2/1NbpN3/2p5/6P1/1P3PBP/2B2RK1 w - - 0 1"
+  }
+}

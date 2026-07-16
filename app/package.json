@@ -16,11 +16,14 @@
     "chapters:verify": "node scripts/chapter-system.mjs verify",
     "chapters:inspect": "node scripts/chapter-system.mjs inspect",
     "chapters:prepare": "node scripts/chapter-system.mjs prepare",
+    "chapters:bundle": "node scripts/chapter-system.mjs bundle",
+    "chapters:start": "node scripts/chapter-system.mjs start",
+    "chapters:publish": "node scripts/chapter-system.mjs publish",
     "chapters:crops": "python scripts/extract_chessboard_crops.py",
     "chapters:validate-lesson": "tsx scripts/validate-chapter-lesson.ts",
     "chapters:verify-import": "tsx scripts/verify-chapter-import.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run chapters:check && npm run typecheck && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs && tsx --test tests/chapter-system.test.ts",
+    "test": "npm run chapters:check && npm run typecheck && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs tests/chapter-workflow.test.mjs && tsx --test tests/chapter-system.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

@@ -297,7 +297,7 @@ input.invalid { border-color: #c44b42; }
 .variation-card summary strong { font-size: 13px; }
 .variation-card summary small { grid-column: 2; color: var(--muted); font-size: 10px; }
 .variation-body { padding: 2px 18px 19px 57px; border-top: 1px solid #eceee9; }
-.variation-body > p { margin: 15px 0 0; color: #46534d; font-size: var(--lesson-content-size); line-height: 1.75; }
+.variation-body > p { margin: 15px 0 0; color: #46534d; font-size: var(--lesson-content-size); line-height: 1.75; white-space: pre-wrap; }
 .lesson-diagram { margin: 22px 0 28px; padding: 18px; border-radius: 14px; color: #eaf3ef; background: var(--forest); }
 .lesson-diagram.compact { margin-bottom: 0; background: #244b40; }
 .diagram-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }

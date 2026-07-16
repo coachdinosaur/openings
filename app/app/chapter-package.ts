@@ -23,6 +23,7 @@ export function parseChapterManifest(value: unknown): ChapterManifestV1 {
   invariant(Number.isInteger(manifest.source?.printedEnd) && manifest.source.printedEnd >= manifest.source.printedStart, "printedEnd must not precede printedStart");
   invariant(Boolean(manifest.lesson?.defaultPosition?.lineId), "default position line is required");
   invariant(Number.isInteger(manifest.lesson?.defaultPosition?.ply) && manifest.lesson.defaultPosition.ply >= 0, "default position ply must be non-negative");
+  if (manifest.id >= 6) invariant(manifest.lesson?.publicationProfile === "authored", "newer chapters require the authored publication profile");
   invariant(manifest.compatibility === "chapter1-legacy" || SHA256.test(manifest.lesson?.expectedCanonicalHash ?? ""), "canonical lesson hash is required");
   invariant(Boolean(manifest.review?.storageKey), "review storage key is required");
   invariant(Number.isInteger(manifest.review?.schemaVersion) && manifest.review.schemaVersion > 0, "review schemaVersion must be positive");

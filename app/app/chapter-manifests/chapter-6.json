@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "id": 6,
+  "source": {
+    "filename": "Chapter6_Catalan.pdf",
+    "sha256": "3291A82991240986378A38F10926B8C60EA4E40DD2E10FCD256718B2A8059D7E",
+    "pdfPageCount": 14,
+    "printedStart": 73,
+    "printedEnd": 86
+  },
+  "lesson": {
+    "publicationProfile": "authored",
+    "expectedCanonicalHash": "AB8983E35172FB711DA96C7851A105F1A9F3EDCEAF6D1E1AE5C1997EE9D1D479",
+    "defaultPosition": {
+      "lineId": "ch6-opening",
+      "ply": 10
+    }
+  },
+  "review": {
+    "storageKey": "catalan-chapter-6-review-v1",
+    "schemaVersion": 3
+  },
+  "verification": {
+    "regions": [
+      {
+        "id": "chapter6-p73-full",
+        "anchors": [
+          "Introduction to",
+          "Variation Index"
+        ]
+      },
+      {
+        "id": "chapter6-p74-left",
+        "anchors": [
+          "and it has recently been",
+          "exclamation mark in Chess Informant"
+        ]
+      },
+      {
+        "id": "chapter6-p74-right",
+        "anchors": [
+          "as Black is doing nothing",
+          "move has been employed at"
+        ]
+      },
+      {
+        "id": "chapter6-p75-left",
+        "anchors": [
+          "leaves Black under pressure along",
+          "Black under pressure along the"
+        ]
+      },
+      {
+        "id": "chapter6-p75-right",
+        "anchors": [
+          "This move has some tricky",
+          "fail to bring Black much"
+        ]
+      },
+      {
+        "id": "chapter6-p76-left",
+        "anchors": [
+          "was not so convincing in",
+          "of putting the knight on"
+        ]
+      },
+      {
+        "id": "chapter6-p76-right",
+        "anchors": [
+          "This is not covered in",
+          "Black eventually prevailed in Gelfand"
+        ]
+      },
+      {
+        "id": "chapter6-p77-left",
+        "anchors": [
+          "although White is still slightly",
+          "White emerges with an extra"
+        ]
+      },
+      {
+        "id": "chapter6-p77-right",
+        "anchors": [
+          "was embarrassing for Black in",
+          "playing with great energy and"
+        ]
+      },
+      {
+        "id": "chapter6-p78-left",
+        "anchors": [
+          "surprising move for an elite",
+          "more interesting options available to"
+        ]
+      },
+      {
+        "id": "chapter6-p78-right",
+        "anchors": [
+          "although it does briefly transpose",
+          "fails to solve his opening"
+        ]
+      },
+      {
+        "id": "chapter6-p79-left",
+        "anchors": [
+          "White regains the pawn under",
+          "with strong pressure along the"
+        ]
+      },
+      {
+        "id": "chapter6-p79-right",
+        "anchors": [
+          "White's chances are slightly preferable",
+          "flexible and the knight on"
+        ]
+      },
+      {
+        "id": "chapter6-p80-left",
+        "anchors": [
+          "Some other moves have been",
+          "always favour White in the"
+        ]
+      },
+      {
+        "id": "chapter6-p80-right",
+        "anchors": [
+          "White had strong pressure in",
+          "point can be seen in"
+        ]
+      },
+      {
+        "id": "chapter6-p81-left",
+        "anchors": [
+          "Black is behind in development",
+          "under heavy pressure on the"
+        ]
+      },
+      {
+        "id": "chapter6-p81-right",
+        "anchors": [
+          "occurred in the recent game",
+          "move occurred in Diaz Hollemaert"
+        ]
+      },
+      {
+        "id": "chapter6-p82-left",
+        "anchors": [
+          "This is the only way",
+          "the general ideas are the"
+        ]
+      },
+      {
+        "id": "chapter6-p82-right",
+        "anchors": [
+          "would have been pretty unpleasant",
+          "to put the knight on"
+        ]
+      },
+      {
+        "id": "chapter6-p83-left",
+        "anchors": [
+          "For the moment Black has",
+          "ready to eliminate the light-squared"
+        ]
+      },
+      {
+        "id": "chapter6-p83-right",
+        "anchors": [
+          "in view of his potential",
+          "but it gives White an"
+        ]
+      },
+      {
+        "id": "chapter6-p84-left",
+        "anchors": [
+          "opportunity to exchange the dark-squared",
+          "of dark-squared bishops obviously favours"
+        ]
+      },
+      {
+        "id": "chapter6-p84-right",
+        "anchors": [
+          "It is impossible for Black",
+          "me in the Bundesliga in"
+        ]
+      },
+      {
+        "id": "chapter6-p85-left",
+        "anchors": [
+          "came up with at the",
+          "White's plan is to improve"
+        ]
+      },
+      {
+        "id": "chapter6-p85-right",
+        "anchors": [
+          "his position on the kingside",
+          "opposite-coloured bishops gives White attacking"
+        ]
+      },
+      {
+        "id": "chapter6-p86-left",
+        "anchors": [
+          "found an improvement over my",
+          "while retaining the all-important queenside"
+        ]
+      },
+      {
+        "id": "chapter6-p86-right",
+        "anchors": [
+          "suitable moment to jump with",
+          "put his opponent under long-term"
+        ]
+      }
+    ]
+  },
+  "evidence": {
+    "pageCount": 14,
+    "diagramCount": 43,
+    "strictDirectory": true,
+    "inventorySha256": "E6D14281FFA919062B028C45C86F5C0177854B3751751F80E9B5E2E16FECED76"
+  }
+}

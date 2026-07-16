@@ -26,6 +26,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $app "node_modules\vinext\dist\cli.j
   if ($installExitCode -ne 0) { throw "Dependency installation failed." }
 }
 
+$patchScript = Join-Path $app "scripts\patch-vinext-static.mjs"
+Write-Host "Checking Vinext Windows compatibility..." -ForegroundColor Cyan
+Push-Location $app
+try {
+  & $node $patchScript
+  $patchExitCode = $LASTEXITCODE
+} finally {
+  Pop-Location
+}
+if ($patchExitCode -ne 0) { throw "The Vinext Windows compatibility patch failed." }
+
 $cli = Join-Path $app "node_modules\vinext\dist\cli.js"
 Write-Host "Building the local app..." -ForegroundColor Cyan
 Push-Location $app

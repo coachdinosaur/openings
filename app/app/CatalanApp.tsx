@@ -291,27 +291,61 @@ function Decision({ value, onChange }: { value: ReviewItem["decision"]; onChange
   </div>;
 }
 
+const SOURCE_MOVE_TOKEN = /(?:\d+\.(?:\.\.)?\s*)?(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|[a-h]x[a-h][1-8]|[a-h][1-8])[+#]?[!?N=]*/g;
+
 function RichText({ lesson, text, refs = [], overlay, onMove }: { lesson: LessonDocument; text: string; refs?: MoveReference[]; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void }) {
   const output: ReactNode[] = [];
+  const usedReferences = new Set<number>();
+  const renderedMoves = new Set<string>();
   let cursor = 0;
-  refs.forEach((reference, index) => {
-    const at = text.indexOf(reference.source, cursor);
-    if (at < 0) return;
-    if (at > cursor) output.push(text.slice(cursor, at));
+  let index = 0;
+
+  for (const match of text.matchAll(SOURCE_MOVE_TOKEN)) {
+    const at = match.index ?? 0;
+    const source = match[0].trim();
+    if (!source) continue;
+    const bare = source.replace(/^\d+\.(?:\.\.)?\s*/, "");
+    if (/^[a-h][1-8]$/.test(bare)) {
+      const prefix = text.slice(Math.max(0, at - 8), at).toLowerCase();
+      if (/(?:^|\s)(?:on|to|the|a|toward) $/.test(prefix)) continue;
+      if (text.slice(at + source.length, at + source.length + 7).toLowerCase().startsWith("-square")) continue;
+    }
+    const forms = new Set([source, bare]);
+    const suppliedIndex = refs.findIndex((reference, referenceIndex) => !usedReferences.has(referenceIndex) && (forms.has(reference.source) || reference.source.endsWith(bare)));
+    if (suppliedIndex >= 0) usedReferences.add(suppliedIndex);
+    let reference = suppliedIndex >= 0 ? refs[suppliedIndex] : undefined;
+    if (!reference) {
+      const exact = lesson.lines.flatMap((line) => line.moves.map((move, moveIndex) => ({ lineId: line.id, moveIndex, move })))
+        .find(({ move }) => move.sourceToken === bare || move.san === bare);
+      reference = exact ? { source, lineId: exact.lineId, moveIndex: exact.moveIndex } : undefined;
+    }
+    if (!reference) continue;
     const move = lineById(lesson, reference.lineId).moves[reference.moveIndex];
-    output.push(<button key={`${move.id}-${index}`} data-move-id={move.id} className={`inline-move ${reference.unresolved ? "unresolved" : ""}`} onClick={() => onMove(reference.lineId, reference.moveIndex)} title={reference.unresolved ? "Source token preserved; exact board position needs review." : `Canonical SAN: ${effectiveSan(move, overlay)}`}>{reference.source}</button>);
-    cursor = at + reference.source.length;
-  });
+    if (!move) continue;
+    const moveKey = `${reference.lineId}:${reference.moveIndex}`;
+    if (renderedMoves.has(moveKey)) continue;
+    renderedMoves.add(moveKey);
+    if (at > cursor) output.push(text.slice(cursor, at));
+    output.push(<button key={`${move.id}-${index}`} data-move-id={move.id} className="inline-move" onClick={() => onMove(reference.lineId, reference.moveIndex)} title={`Canonical SAN: ${effectiveSan(move, overlay)}`}>{source}</button>);
+    cursor = at + match[0].length;
+    index += 1;
+  }
   output.push(text.slice(cursor));
   return <>{output}</>;
 }
 
+function sourceEvidenceCrop(span: LessonDocument["sourceSpans"][number]): string {
+  const chapterMatch = /^\/source\/(chapter[78])\/pages\/printed-\d+\.png$/.exec(span.crop);
+  return chapterMatch ? `/source/${chapterMatch[1]}/regions/printed-${span.printedPage}-${span.column}.png` : span.crop;
+}
+
 function SourceRegion({ lesson, spanId }: { lesson: LessonDocument; spanId: string }) {
   const span = spanById(lesson, spanId);
+  const inlinePdfText = /^\/source\/chapter[78]\//.test(span.crop);
   return <div className="source-region">
     <span>Source order {span.order}</span>
     <strong>Printed page {span.printedPage} · {span.column} column</strong>
-    <details><summary>View source evidence</summary><img loading="lazy" decoding="async" src={span.crop} alt={`Printed page ${span.printedPage} ${span.column} column crop`} /></details>
+    <details open={inlinePdfText}><summary>{inlinePdfText ? "Original PDF source" : "View source evidence"}</summary><img loading="lazy" decoding="async" src={sourceEvidenceCrop(span)} alt={`Printed page ${span.printedPage} ${span.column} column crop`} /></details>
   </div>;
 }
 
@@ -340,7 +374,7 @@ const Narrative = memo(function Narrative({ lesson, overlay, onMove, onJump, con
         content = <DiagramCard diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />;
       } else if (block.type === "variation") {
         const diagram = block.diagramId ? diagramById(lesson, block.diagramId) : null;
-        content = <details className="variation-card"><summary><span>Sideline</span><strong>{block.title}</strong></summary><div className="variation-body"><p><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />}</div></details>;
+        content = <details open className="variation-card"><summary><span>Source variation</span><strong>{block.title}</strong></summary><div className="variation-body"><p><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />}</div></details>;
       } else if (block.type === "move-sequence") content = <div className="main-move-block"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></div>;
       else if (block.type === "assessment") content = <blockquote className="final-assessment"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></blockquote>;
       else content = <p className="lesson-prose"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>;

@@ -39,3 +39,21 @@ test("rejects manifest filenames that disagree with chapter identity", () => {
   manifest.source.filename = "Chapter20_Catalan.pdf";
   assert.throws(() => parseChapterManifest(manifest), /source filename must match id/);
 });
+
+test("requires the authored publication profile for new chapter manifests", () => {
+  const manifest = structuredClone(CHAPTER_2.manifest);
+  manifest.id = 6;
+  manifest.source.filename = "Chapter6_Catalan.pdf";
+  assert.throws(() => parseChapterManifest(manifest), /authored publication profile/);
+});
+
+test("requires authored diagram paths for new chapter packages", () => {
+  const config = copy();
+  config.id = "6";
+  config.label = "Chapter 6";
+  config.manifest.id = 6;
+  config.manifest.lesson.publicationProfile = "authored";
+  config.lesson.diagrams[0].positionStatus = "source-verified";
+  config.lesson.diagrams[0].moveIndex = -1;
+  assert.ok(validateChapterConfig(config).some((error) => error.includes(`diagram ${config.lesson.diagrams[0].id} must be derived from an authored legal line`)));
+});

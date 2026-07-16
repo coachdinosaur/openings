@@ -1,0 +1,25 @@
+{
+  "chapters": [
+    {
+      "chapter": 6,
+      "pageStart": 1,
+      "pageEnd": 14,
+      "printedStart": 73,
+      "expectedCrops": 43
+    },
+    {
+      "chapter": 7,
+      "pageStart": 15,
+      "pageEnd": 39,
+      "printedStart": 87,
+      "expectedCrops": 73
+    },
+    {
+      "chapter": 8,
+      "pageStart": 40,
+      "pageEnd": 53,
+      "printedStart": 112,
+      "expectedCrops": 37
+    }
+  ]
+}

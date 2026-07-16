@@ -2,6 +2,8 @@ import { Chess } from "chess.js";
 import type { ChapterConfig } from "./chapter-definition";
 import type { VariationMove, VariationNode } from "./lesson-model";
 
+const DISPLAYED_MOVE_TOKEN = /(?:\d+\.(?:\.\.)?\s*)?(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|[a-h]x[a-h][1-8]|[a-h][1-8])[+#]?[!?N=]*/g;
+
 function unique(values: string[], label: string, errors: string[]) {
   const seen = new Set<string>();
   for (const value of values) {
@@ -98,6 +100,13 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
     if (!legacy && Number(config.id) >= 3 && "text" in block && /(?:^|\s)\d+\.(?:\.\.)?\s*(?:O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8])/.test(block.text) && !block.moveRefs?.length) {
       errors.push(`block ${block.id} contains chess notation but has no linked moves`);
     }
+    if (!legacy && Number(config.id) >= 6 && "text" in block) {
+      const displayed = [...block.text.matchAll(DISPLAYED_MOVE_TOKEN)].map((match) => match[0].trim());
+      const references = "moveRefs" in block ? block.moveRefs ?? [] : [];
+      if (displayed.length !== references.length || displayed.some((token, index) => references[index]?.source !== token)) {
+        errors.push(`block ${block.id} must link every displayed chess token in source order`);
+      }
+    }
   });
 
   lesson.diagrams.forEach((diagram) => {
@@ -121,6 +130,35 @@ export function validateChapterConfig(config: ChapterConfig): string[] {
       }
     }
   });
+
+  // Chapters 1-5 established the learner-facing lesson contract. Starting with
+  // Chapter 6, a package must preserve that authored shape rather than exposing
+  // extracted regions or independently recognised board positions as a lesson.
+  // Extraction remains useful authoring evidence, but it is not publishable
+  // content on its own.
+  const requiresAuthoredPublication = !legacy && Number(config.id) >= 6;
+  if (requiresAuthoredPublication && config.manifest.lesson.publicationProfile !== "authored") {
+    errors.push("newer chapters require the authored publication profile");
+  }
+  if (requiresAuthoredPublication || config.manifest.lesson.publicationProfile === "authored") {
+    const variationSpans = new Set(lesson.blocks.filter((block) => block.type === "variation").map((block) => block.sourceSpanId));
+    for (const span of lesson.sourceSpans) {
+      if (!variationSpans.has(span.id)) errors.push(`source span ${span.id} needs an authored variation block`);
+    }
+    for (const block of lesson.blocks) {
+      if (block.type !== "variation") continue;
+      if (!block.title.trim() || block.text.trim().length < 40) errors.push(`variation block ${block.id} needs authored title and prose`);
+      if (/^source position\b|^chapter \d+ analysis - printed page/i.test(block.title) || /this region contains the source analysis|linked source image preserves the complete notation/i.test(block.text)) {
+        errors.push(`variation block ${block.id} contains generated placeholder content`);
+      }
+    }
+    for (const diagram of lesson.diagrams) {
+      if (diagram.positionStatus !== "deterministically derived" || !diagram.lineId || diagram.moveIndex === null || diagram.moveIndex < 0) {
+        errors.push(`diagram ${diagram.id} must be derived from an authored legal line`);
+      }
+      if (/^source position\b/i.test(diagram.role)) errors.push(`diagram ${diagram.id} needs an authored role`);
+    }
+  }
 
   config.sections.forEach((section) => {
     if (!blockMap.has(section.blockId)) errors.push(`section ${section.id} references missing block ${section.blockId}`);

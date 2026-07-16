@@ -2,7 +2,7 @@
 
 ## Required artifacts
 
-- Root input: `ChapterN_Catalan.pdf` (immutable source evidence).
+- Root input: `ChapterN_Catalan.pdf` (immutable source evidence). A combined source PDF is first split into these staged inputs by `chapters:bundle`, with a versioned source-bundle manifest that records the source hash, complete page ranges, and every derived hash.
 - Lesson: `app/app/chapterN-lesson.ts`, exporting the complete `LessonDocument`, annotated move IDs, and section list.
 - Manifest: `app/app/chapter-manifests/chapter-N.json`, declaring versioned source, canonical, review, verification, and evidence facts.
 - Package: `app/app/chapter-packages/chapter-N.ts`, exporting `CHAPTER_CONFIG`.
@@ -11,7 +11,7 @@
 
 ## Package fields
 
-The manifest sets the numeric identity, printed boundaries, source filename/hash/page count, legal default position, unique chapter-specific review key, canonical lesson hash, evidence counts, and verification regions. The package supplies the complete lesson, annotated move IDs, and section anchors through `defineChapterPackage`. The source filename must be `ChapterN_Catalan.pdf`, and every imported source region needs at least one stable text anchor.
+The manifest sets the numeric identity, printed boundaries, source filename/hash/page count, legal default position, unique chapter-specific review key, canonical lesson hash, evidence counts, and verification regions. Starting with Chapter 6, `lesson.publicationProfile` must be `"authored"`. The package supplies the complete lesson, annotated move IDs, and section anchors through `defineChapterPackage`. The source filename must be `ChapterN_Catalan.pdf`, and every imported source region needs at least one stable text anchor.
 
 ## Source fidelity
 
@@ -30,6 +30,7 @@ A chapter is publishable only when all are true:
 2. Source spans, blocks, lines, moves, diagrams, sections, and import regions pass the shared structural validator.
 3. Every move path is legal and every diagram link/FEN is valid.
    Beginning with Chapter 3, the shared validator must also reject any block that contains numbered chess notation but has no move links. Chapters 1 and 2 predate this publication gate.
+   Beginning with Chapter 6, every source region must have an authored variation block, and every diagram must derive from an authored legal line. Generated source summaries and independently recognized source positions are rejected.
 4. The complete lesson canonical hash is frozen in the package.
 5. `chapters:verify`, `chapters:sync`, `chapters:check`, typecheck, build, tests, and lint pass.
 6. Learner, review, and import routes render correctly, navigation includes the chapter automatically, and the exact PDF produces a zero-change import.

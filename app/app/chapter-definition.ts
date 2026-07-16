@@ -15,6 +15,8 @@ export type ChapterManifestV1 = {
     printedEnd: number;
   };
   lesson: {
+    /** Required for new packages so extracted evidence cannot be published as a learner lesson. */
+    publicationProfile?: "authored";
     expectedCanonicalHash?: string;
     defaultPosition: { lineId: string; ply: number };
   };

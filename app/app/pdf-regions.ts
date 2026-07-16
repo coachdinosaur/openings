@@ -21,7 +21,10 @@ export async function extractDeclaredRegions(pdf: PdfDocument, lesson: LessonDoc
     const items = content.items
       .filter((item): item is { str: string; transform: number[] } => Boolean(item && typeof item === "object" && "str" in item && "transform" in item))
       .map((item) => ({ str: item.str, x: item.transform[4], top: viewport.height - item.transform[5] }))
-      .filter((item) => item.x >= span.bbox.x0 - 8 && item.x <= span.bbox.x1 + 8 && item.top >= span.bbox.top - 18 && item.top <= span.bbox.bottom + 18)
+      // Use the declared region exactly. Expanding a column crosses the gutter on
+      // dense pages and interleaves adjacent-column tokens, which makes otherwise
+      // stable source anchors fail exact-PDF verification.
+      .filter((item) => item.x >= span.bbox.x0 && item.x < span.bbox.x1 && item.top >= span.bbox.top && item.top <= span.bbox.bottom)
       .sort((left, right) => Math.abs(left.top - right.top) < 2 ? left.x - right.x : left.top - right.top);
     const text = items.map((item) => item.str).join(" ").replace(/\s+/g, " ").trim();
     const missing = region.anchors.filter((anchor) => !text.includes(anchor));
