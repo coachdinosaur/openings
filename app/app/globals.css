@@ -141,7 +141,7 @@ h1, h2, h3, h4, h5 { font-family: Manrope, Inter, sans-serif; }
 .narrative hr { margin: 34px 0; border: 0; border-top: 1px solid var(--line); }
 .narrative code { font-size: .86em; }
 .inline-move { display: inline; margin: 0; padding: 1px 4px; border: 0; border-radius: 5px; color: var(--forest-2); background: rgba(36, 101, 84, .09); font: inherit; font-weight: 750; text-decoration: none; }
-.inline-move:hover { color: white; background: var(--forest-2); }
+.inline-move:hover, .inline-move.active { color: white; background: var(--forest-2); }
 .interactive-move:focus-visible { outline: 2px solid var(--forest-2); outline-offset: 1px; }
 .fen-block { margin: 20px 0 26px; padding: 14px; border: 1px solid #cbd7d0; border-radius: 12px; background: #eef3ee; }
 .fen-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

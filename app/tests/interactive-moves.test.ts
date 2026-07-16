@@ -82,10 +82,26 @@ test("every published Markdown chapter contains navigable move lines", async () 
 test("a clicked Markdown move carries its complete previous/next navigation path", () => {
   const resolver = new MarkdownMoveResolver("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
   const tokens = resolver.resolveText("1.d4 Nf6 2.c4 e6");
+  const first = tokens[0]?.navigation;
   const last = tokens.at(-1)?.navigation;
+  assert.ok(first);
   assert.ok(last);
+  assert.equal(first.index, 1);
+  assert.equal(first.steps[first.index]?.label, "1.d4");
+  assert.deepEqual(first.steps.slice(1).map((step) => step.label), ["1.d4", "Nf6", "2.c4", "e6"]);
   assert.equal(last.index, 4);
   assert.deepEqual(last.steps.slice(1).map((step) => step.label), ["1.d4", "Nf6", "2.c4", "e6"]);
+});
+
+test("Chapter 1's variation index moves forward from the clicked 4.Nf3", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-1-catalan.md", import.meta.url), "utf8");
+  const variationIndex = markdown.split(/\r?\n/).find((line) => line.startsWith("Variation Index:"));
+  assert.ok(variationIndex);
+
+  const clicked = new MarkdownMoveResolver().resolveText(variationIndex).find((token) => token.display === "4.Nf3")?.navigation;
+  assert.ok(clicked);
+  assert.equal(clicked.steps[clicked.index]?.label, "4.Nf3");
+  assert.equal(clicked.steps[clicked.index + 1]?.label, "4...g6");
 });
 
 test("numbered sibling variations can return to an older exact branch root", () => {
@@ -110,11 +126,11 @@ test("Chapter 1 returns from the 8.Nbd2 sideline before the 8...b6 novelty", asy
   const tokens = section.split(/\r?\n/).flatMap((line) => resolver.resolveText(line));
   const novelty = tokens.find((token) => token.display === "8...b6N");
   assert.ok(novelty?.navigation, "8...b6N should follow 8.Bf4!? after the embedded 8.Nbd2 sideline");
-  assert.deepEqual(novelty.navigation.steps.slice(-3).map((step) => step.label), ["7...c6", "8.Bf4!?", "8...b6N"]);
+  assert.deepEqual(novelty.navigation.steps.slice(novelty.navigation.index - 2, novelty.navigation.index + 1).map((step) => step.label), ["7...c6", "8.Bf4!?", "8...b6N"]);
 
   const mainLineEnd = tokens.find((token) => token.display === "11.Rad1");
   assert.ok(mainLineEnd?.navigation, "the main line should remain navigable after both alternatives");
-  assert.deepEqual(mainLineEnd.navigation.steps.slice(-8).map((step) => step.label), [
+  assert.deepEqual(mainLineEnd.navigation.steps.slice(mainLineEnd.navigation.index - 7, mainLineEnd.navigation.index + 1).map((step) => step.label), [
     "7...c6", "8.Bf4!?", "8...b6N", "9.Nbd2", "c5", "10.dxc5", "bxc5", "11.Rad1",
   ]);
 });
@@ -162,6 +178,23 @@ test("visible FEN diagrams render as selectable main-board positions", () => {
   assert.match(html, /Critical position — position/);
   assert.match(html, /Show on main board/);
   assert.match(html, /aria-label="Chess position:/);
+});
+
+test("the active Markdown move stays marked while arrow navigation walks its line", () => {
+  const markdown = "# Chapter 1\n\n## Page 1\n\n1.d4 Nf6 2.c4 e6";
+  const navigation = new MarkdownMoveResolver().resolveText("1.d4 Nf6 2.c4 e6")[0]?.navigation;
+  assert.ok(navigation);
+  assert.equal(navigation.steps[navigation.index + 1]?.label, "Nf6", "Right Arrow should have a forward step after the clicked move");
+
+  const html = renderToStaticMarkup(createElement(MarkdownChapterView, {
+    markdown,
+    onMove: () => {},
+    activeNavigation: navigation,
+  }));
+
+  assert.equal(html.match(/aria-current="step"/g)?.length, 1);
+  assert.match(html, /class="inline-move interactive-move active"[^>]*>1\.d4<\/button>/);
+  assert.doesNotMatch(html, /class="inline-move interactive-move active"[^>]*>Nf6<\/button>/);
 });
 
 test("Chapters 1-8 expose every PDF diagram as a visible FEN board", async () => {

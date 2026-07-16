@@ -19,6 +19,11 @@ function uniqueCandidates(candidates: PositionPath[]): PositionPath[] {
   });
 }
 
+function pathExtends(steps: NavigationStep[], prefix: NavigationStep[]): boolean {
+  if (steps.length <= prefix.length) return false;
+  return prefix.every((step, index) => step.fen === steps[index]?.fen && step.label === steps[index]?.label);
+}
+
 function parenDepthAt(text: string, pos: number): number {
   let depth = 0;
   for (let index = 0; index < pos; index++) {
@@ -35,6 +40,7 @@ export class MarkdownMoveResolver {
   private knownRootFens: Set<string>;
   private knownMoveIndex: Map<string, RootMoveCandidate[]>;
   private moveCache: Map<string, ReturnType<typeof resolveChessMove>>;
+  private navigations: MoveNavigation[];
 
   constructor(fen = START_FEN, label = "Initial position") {
     const root = { fen, steps: [{ fen, label }] };
@@ -44,6 +50,7 @@ export class MarkdownMoveResolver {
     this.knownRootFens = new Set();
     this.knownMoveIndex = new Map();
     this.moveCache = new Map();
+    this.navigations = [];
     this.indexRoot(root);
     this.resetHistory(root);
   }
@@ -109,6 +116,15 @@ export class MarkdownMoveResolver {
     const move = resolveChessMove(fen, display);
     this.moveCache.set(key, move);
     return move;
+  }
+
+  private createNavigation(path: PositionPath): MoveNavigation {
+    for (const navigation of this.navigations) {
+      if (pathExtends(path.steps, navigation.steps)) navigation.steps = path.steps;
+    }
+    const navigation = { steps: path.steps, index: path.steps.length - 1 };
+    this.navigations.push(navigation);
+    return navigation;
   }
 
   currentNavigation(): MoveNavigation {
@@ -178,7 +194,7 @@ export class MarkdownMoveResolver {
         lastBefore = before;
         active = resolved;
         this.remember(resolved);
-        tokens.push({ display, index: at, navigation: { steps: resolved.steps, index: resolved.steps.length - 1 } });
+        tokens.push({ display, index: at, navigation: this.createNavigation(resolved) });
       } else {
         tokens.push({ display, index: at, navigation: null });
       }

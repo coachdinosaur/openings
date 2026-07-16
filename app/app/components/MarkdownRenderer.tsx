@@ -3,12 +3,40 @@
 /* Static lesson diagrams use the same local piece sprites as the main board. */
 /* eslint-disable @next/next/no-img-element */
 
-import { memo, ReactNode, useMemo } from "react";
+import { createContext, memo, ReactNode, useContext, useMemo } from "react";
 import { Chess, type Square } from "chess.js";
 import { MarkdownMoveResolver, type MarkdownMoveToken, type MoveNavigation } from "../lib/markdown-moves";
 import { extractFenBlocks } from "../lib/markdown-chapter";
 
 type MoveHandler = (navigation: MoveNavigation) => void;
+
+const ActiveNavigationContext = createContext<MoveNavigation | null>(null);
+
+function isActiveNavigationStep(candidate: MoveNavigation, active: MoveNavigation | null): boolean {
+  if (!active || candidate.index !== active.index) return false;
+  for (let index = 0; index <= active.index; index++) {
+    const candidateStep = candidate.steps[index];
+    const activeStep = active.steps[index];
+    if (!candidateStep || !activeStep || candidateStep.fen !== activeStep.fen || candidateStep.label !== activeStep.label) return false;
+  }
+  return true;
+}
+
+const InteractiveMove = memo(function InteractiveMove({ display, navigation, onMove }: { display: string; navigation: MoveNavigation; onMove: MoveHandler }) {
+  const activeNavigation = useContext(ActiveNavigationContext);
+  const active = isActiveNavigationStep(navigation, activeNavigation);
+  return <button
+    type="button"
+    className={`inline-move interactive-move${active ? " active" : ""}`}
+    aria-label={`Show position after ${display}`}
+    aria-current={active ? "step" : undefined}
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onMove(navigation);
+    }}
+  >{display}</button>;
+});
 
 function StaticChessboard({ fen }: { fen: string }) {
   const chess = new Chess(fen);
@@ -56,17 +84,12 @@ function renderPlaceholders(template: string, tokens: MarkdownMoveToken[], onMov
     if (match.index > cursor) result.push(template.slice(cursor, match.index));
     const token = tokens[Number(match[1])];
     if (token.navigation) {
-      result.push(<button
-        type="button"
-        className="inline-move interactive-move"
-        aria-label={`Show position after ${token.display}`}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onMove(token.navigation as MoveNavigation);
-        }}
+      result.push(<InteractiveMove
+        display={token.display}
+        navigation={token.navigation}
+        onMove={onMove}
         key={`${key}-move-${match[1]}`}
-      >{token.display}</button>);
+      />);
     } else {
       result.push(<span key={`${key}-plain-${match[1]}`}>{token.display}</span>);
     }
@@ -189,7 +212,9 @@ function parseMarkdown(markdown: string, onMove: MoveHandler): ReactNode[] {
   return nodes;
 }
 
-export const MarkdownChapterView = memo(function MarkdownChapterView({ markdown, onMove }: { markdown: string; onMove: MoveHandler }) {
+export const MarkdownChapterView = memo(function MarkdownChapterView({ markdown, onMove, activeNavigation = null }: { markdown: string; onMove: MoveHandler; activeNavigation?: MoveNavigation | null }) {
   const elements = useMemo(() => parseMarkdown(markdown, onMove), [markdown, onMove]);
-  return <article className="narrative markdown-narrative" aria-label="Chapter lesson">{elements}</article>;
+  return <ActiveNavigationContext value={activeNavigation}>
+    <article className="narrative markdown-narrative" aria-label="Chapter lesson">{elements}</article>
+  </ActiveNavigationContext>;
 });
