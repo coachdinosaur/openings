@@ -1,59 +1,122 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canonicalize } from "../app/canonical";
-import { CHAPTER_CONFIG as CHAPTER_2 } from "../app/chapter-packages/chapter-2";
-import { parseChapterManifest } from "../app/chapter-package";
-import type { ChapterConfig } from "../app/chapter-definition";
-import { validateChapterConfig } from "../app/chapter-validation";
+import { parseChapter, extractPages, extractFenBlocks } from "../app/lib/markdown-chapter";
 
-function copy(): ChapterConfig {
-  return structuredClone(CHAPTER_2);
-}
-
-test("canonical hashes are stable across server-to-client serialization", () => {
-  const serverValue = { id: "chapter", optional: undefined, nested: { value: 1, omitted: undefined } };
-  const clientValue = JSON.parse(JSON.stringify(serverValue));
-  assert.equal(canonicalize(serverValue), canonicalize(clientValue));
+test("parseChapter extracts title from top-level heading", () => {
+  const chapter = parseChapter("chapter-10-catalan.md", "# Chapter 10 — Test\n\n## Page 1\n\nContent");
+  assert.equal(chapter.title, "Chapter 10 — Test");
+  assert.equal(chapter.chapterNumber, 10);
+  assert.equal(chapter.id, "chapter-10-catalan");
 });
 
-test("rejects an annotated move that is absent from the lesson", () => {
-  const config = copy();
-  config.annotatedMoveIds.push("missing-move");
-  assert.ok(validateChapterConfig(config).includes("annotated move missing-move does not exist"));
+test("parseChapter extracts default title when no heading", () => {
+  const chapter = parseChapter("chapter-5-test.md", "## Page 1\n\nContent");
+  assert.equal(chapter.title, "Chapter 5");
+  assert.equal(chapter.chapterNumber, 5);
 });
 
-test("rejects diagram positions that disagree with their move paths", () => {
-  const config = copy();
-  config.lesson.diagrams[0].fen = config.lesson.basePosition.fen;
-  assert.ok(validateChapterConfig(config).some((error) => /diagram .* FEN does not match/.test(error)));
+test("extractPages finds ## Page N headings", () => {
+  const content = "## Page 1\n\nContent 1\n\n## Page 2\n\nContent 2\n\n## Page 3\n\nContent 3";
+  const pages = extractPages(content);
+  assert.equal(pages.length, 3);
+  assert.equal(pages[0].number, 1);
+  assert.equal(pages[1].number, 2);
+  assert.equal(pages[2].number, 3);
 });
 
-test("requires import regions to cover source spans in reading order", () => {
-  const config = copy();
-  config.importDefinition.regions.reverse();
-  assert.ok(validateChapterConfig(config).includes("import regions must cover source spans in reading order"));
+test("extractPages returns single page when no page headings", () => {
+  const content = "# Chapter\n\nSome content without page breaks.";
+  const pages = extractPages(content);
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0].number, 1);
 });
 
-test("rejects manifest filenames that disagree with chapter identity", () => {
-  const manifest = structuredClone(CHAPTER_2.manifest);
-  manifest.source.filename = "Chapter20_Catalan.pdf";
-  assert.throws(() => parseChapterManifest(manifest), /source filename must match id/);
+test("extractPages preserves markdown content inside pages", () => {
+  const content = "## Page 1\n\n**Bold text** and *italic*";
+  const pages = extractPages(content);
+  assert.ok(pages[0].markdown.includes("**Bold text**"));
+  assert.ok(pages[0].markdown.includes("*italic*"));
 });
 
-test("requires the authored publication profile for new chapter manifests", () => {
-  const manifest = structuredClone(CHAPTER_2.manifest);
-  manifest.id = 6;
-  manifest.source.filename = "Chapter6_Catalan.pdf";
-  assert.throws(() => parseChapterManifest(manifest), /authored publication profile/);
+test("extractPages rejects duplicate page numbers", () => {
+  const content = "## Page 1\n\nContent\n\n## Page 1\n\nMore content";
+  assert.throws(() => extractPages(content), /Duplicate page heading/);
 });
 
-test("requires authored diagram paths for new chapter packages", () => {
-  const config = copy();
-  config.id = "6";
-  config.label = "Chapter 6";
-  config.manifest.id = 6;
-  config.manifest.lesson.publicationProfile = "authored";
-  config.lesson.diagrams[0].positionStatus = "source-verified";
-  config.lesson.diagrams[0].moveIndex = -1;
-  assert.ok(validateChapterConfig(config).some((error) => error.includes(`diagram ${config.lesson.diagrams[0].id} must be derived from an authored legal line`)));
+test("extractPages rejects non-sequential page order", () => {
+  const content = "## Page 2\n\nContent\n\n## Page 1\n\nMore content";
+  assert.throws(() => extractPages(content), /not in ascending order/);
+});
+
+test("extractPages handles Windows line endings", () => {
+  const content = "## Page 1\r\n\r\nContent\r\n\r\n## Page 2\r\n\r\nMore content";
+  const pages = extractPages(content);
+  assert.equal(pages.length, 2);
+});
+
+test("extractPages does not treat deeper headings as page boundaries", () => {
+  const content = "## Page 1\n\n### Not a page\n\nContent\n\n#### Also not a page\n\nMore content";
+  const pages = extractPages(content);
+  assert.equal(pages.length, 1);
+});
+
+test("Chapter 10 fixture produces exactly 11 pages", () => {
+  const content = `# Chapter 10 — Catalan 4...dxc4: 5...a6 and 6...Nc6
+## Page 1
+Content
+## Page 2
+Content
+## Page 3
+Content
+## Page 4
+Content
+## Page 5
+Content
+## Page 6
+Content
+## Page 7
+Content
+## Page 8
+Content
+## Page 9
+Content
+## Page 10
+Content
+## Page 11
+Content`;
+  const pages = extractPages(content);
+  assert.equal(pages.length, 11);
+});
+
+test("extractFenBlocks detects FEN blocks", () => {
+  const markdown = "**FEN:**\n`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`";
+  const blocks = extractFenBlocks(markdown);
+  assert.equal(blocks.length, 1);
+  assert.ok(blocks[0].fen.includes("rnbqkbnr"));
+});
+
+test("extractFenBlocks supports multiple FEN blocks per page", () => {
+  const markdown = "**FEN:**\n`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`\n\nText\n\n**FEN:**\n`4k3/8/8/8/8/8/8/4K3 w - - 0 1`";
+  const blocks = extractFenBlocks(markdown);
+  assert.equal(blocks.length, 2);
+});
+
+test("extractFenBlocks ignores inline code not associated with FEN label", () => {
+  const markdown = "Some `inline code` and **FEN:**\n`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`";
+  const blocks = extractFenBlocks(markdown);
+  assert.equal(blocks.length, 1);
+});
+
+test("extractFenBlocks returns empty for no FEN", () => {
+  const markdown = "Just some text without FEN";
+  const blocks = extractFenBlocks(markdown);
+  assert.equal(blocks.length, 0);
+});
+
+test("extractChapterNumber from various filename patterns", () => {
+  const ch1 = parseChapter("chapter-10-catalan.md", "# Chapter 10");
+  assert.equal(ch1.chapterNumber, 10);
+
+  const ch2 = parseChapter("Chapter_9_Catalan.md", "# Chapter 9");
+  assert.equal(ch2.chapterNumber, 9);
 });
