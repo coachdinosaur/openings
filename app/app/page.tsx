@@ -1,12 +1,9 @@
-import CatalanApp from "./CatalanApp";
-import { loadAllChapters, getChapterSummaries } from "./lib/chapter-markdown-loader";
+import { CHAPTER_IDS, CHAPTER_SUMMARIES, loadChapter } from "./chapter-catalog.generated";
 
 export default async function Home() {
-  const chapters = loadAllChapters();
-  const summaries = getChapterSummaries();
-  const firstChapter = chapters[0];
-  if (!firstChapter) {
-    return <div className="page-loader"><p>No chapters found.</p></div>;
-  }
-  return <CatalanApp chapter={firstChapter} chapters={summaries} chapterId={firstChapter.id} />;
+  const [{ default: CatalanApp }, config] = await Promise.all([
+    import("./CatalanApp"),
+    loadChapter(CHAPTER_IDS[0]),
+  ]);
+  return <CatalanApp config={config} chapters={CHAPTER_SUMMARIES} />;
 }

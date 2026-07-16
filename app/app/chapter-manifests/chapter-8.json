@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "id": 8,
+  "source": {
+    "filename": "Chapter8_Catalan.pdf",
+    "sha256": "E48B324A5B0661A229EA9E5259F285F2743076D1B3AC4A9015E02DED4E70393D",
+    "pdfPageCount": 14,
+    "printedStart": 112,
+    "printedEnd": 125
+  },
+  "lesson": {
+    "publicationProfile": "authored",
+    "expectedCanonicalHash": "4EE1A6FE665F4E7C8E18878BFC812E4710BB1B25F975599AD83B5CFEB85B7731",
+    "defaultPosition": {
+      "lineId": "ch8-opening",
+      "ply": 12
+    }
+  },
+  "review": {
+    "storageKey": "catalan-chapter-8-review-v1",
+    "schemaVersion": 3
+  },
+  "verification": {
+    "regions": [
+      {
+        "id": "chapter8-p112-full",
+        "anchors": [
+          "Variation Index",
+          "note to"
+        ]
+      },
+      {
+        "id": "chapter8-p113-left",
+        "anchors": [
+          "is an important alternative for",
+          "is clearly inferior in view"
+        ]
+      },
+      {
+        "id": "chapter8-p113-right",
+        "anchors": [
+          "Black is helpless against White's",
+          "not go into at this"
+        ]
+      },
+      {
+        "id": "chapter8-p114-left",
+        "anchors": [
+          "allows White to seize an",
+          "time and his prospects are"
+        ]
+      },
+      {
+        "id": "chapter8-p114-right",
+        "anchors": [
+          "White maintains the pressure in",
+          "by far Black's most popular"
+        ]
+      },
+      {
+        "id": "chapter8-p115-left",
+        "anchors": [
+          "The most popular move for",
+          "dubious move has rarely been"
+        ]
+      },
+      {
+        "id": "chapter8-p115-right",
+        "anchors": [
+          "also examined the following funny",
+          "Naturally Black has other possible"
+        ]
+      },
+      {
+        "id": "chapter8-p116-left",
+        "anchors": [
+          "This position has occurred three",
+          "standard queen lift is very"
+        ]
+      },
+      {
+        "id": "chapter8-p116-right",
+        "anchors": [
+          "White could have decided the",
+          "the case in the following"
+        ]
+      },
+      {
+        "id": "chapter8-p117-left",
+        "anchors": [
+          "ll the white",
+          "An amusing yet"
+        ]
+      },
+      {
+        "id": "chapter8-p117-right",
+        "anchors": [
+          "is looks fairly natura",
+          "is looks fairly natura"
+        ]
+      },
+      {
+        "id": "chapter8-p118-left",
+        "anchors": [
+          "is untouchable in view of",
+          "as if Black has sufficient"
+        ]
+      },
+      {
+        "id": "chapter8-p118-right",
+        "anchors": [
+          "White's material advantage should decide",
+          "of deciding the game with"
+        ]
+      },
+      {
+        "id": "chapter8-p119-left",
+        "anchors": [
+          "By transposition we have reached",
+          "blow allows White co develop"
+        ]
+      },
+      {
+        "id": "chapter8-p119-right",
+        "anchors": [
+          "xdS wins for White as",
+          "like to recommend the following"
+        ]
+      },
+      {
+        "id": "chapter8-p120-left",
+        "anchors": [
+          "believe the bishop pair is",
+          "is doomed to long term"
+        ]
+      },
+      {
+        "id": "chapter8-p120-right",
+        "anchors": [
+          "Black cannot swap the queenside",
+          "has an opportunity to react"
+        ]
+      },
+      {
+        "id": "chapter8-p121-left",
+        "anchors": [
+          "was better to accept the",
+          "clear positional advantage in Curator"
+        ]
+      },
+      {
+        "id": "chapter8-p121-right",
+        "anchors": [
+          "have two options to look",
+          "cl-pawn should easily decide the"
+        ]
+      },
+      {
+        "id": "chapter8-p122-left",
+        "anchors": [
+          "as Black's knight will be",
+          "White has to settle for"
+        ]
+      },
+      {
+        "id": "chapter8-p122-right",
+        "anchors": [
+          "This was my original solution",
+          "idea in this type of"
+        ]
+      },
+      {
+        "id": "chapter8-p123-left",
+        "anchors": [
+          "This looks to me to",
+          "of defending the pawn with"
+        ]
+      },
+      {
+        "id": "chapter8-p123-right",
+        "anchors": [
+          "White had nothing special in",
+          "also cannot solve his problems"
+        ]
+      },
+      {
+        "id": "chapter8-p124-left",
+        "anchors": [
+          "and now of course Black",
+          "was the line from GM"
+        ]
+      },
+      {
+        "id": "chapter8-p124-right",
+        "anchors": [
+          "The queen takes control of",
+          "This is even stronger than"
+        ]
+      },
+      {
+        "id": "chapter8-p125-left",
+        "anchors": [
+          "then White's initiative on the",
+          "kingside should easily decide the"
+        ]
+      },
+      {
+        "id": "chapter8-p125-right",
+        "anchors": [
+          "variation seems to me to",
+          "White is in great shape"
+        ]
+      }
+    ]
+  },
+  "evidence": {
+    "pageCount": 14,
+    "diagramCount": 37,
+    "strictDirectory": true,
+    "inventorySha256": "8C69A80654AECEEA4131BFBD486FF870A5DB6A10991E09D88ECCE3986630D875"
+  }
+}

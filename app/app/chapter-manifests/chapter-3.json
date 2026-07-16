@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": 3,
+  "source": {
+    "filename": "Chapter3_Catalan.pdf",
+    "sha256": "35AD12F7AD89E7474BF434DBC34AB217E297BA20C8BB48BF2F25B45EF5F32E7A",
+    "pdfPageCount": 17,
+    "printedStart": 34,
+    "printedEnd": 50
+  },
+  "lesson": {
+    "expectedCanonicalHash": "87683CDB1D5A2B7AB85A38E7D3173332B3A345D206694AF07FC39D26F2D67F7E",
+    "defaultPosition": { "lineId": "ch3-opening", "ply": 11 }
+  },
+  "review": { "storageKey": "catalan-chapter-3-review-v2", "schemaVersion": 2 },
+  "verification": {
+    "regions": [
+      { "id": "chapter3-p34-full", "anchors": ["Variation Index", "A)", "B)"] },
+      { "id": "chapter3-p35-left", "anchors": ["most principled continuation", "typical Catalan pressure"] },
+      { "id": "chapter3-p35-right", "anchors": ["clear positional edge", "Viktor Korchnoi"] },
+      { "id": "chapter3-p36-left", "anchors": ["new and surprising", "Capturing the knight"] },
+      { "id": "chapter3-p36-right", "anchors": ["Pinning the d-pawn", "subtle manoeuvre"] },
+      { "id": "chapter3-p37-left", "anchors": ["pair of bishops", "very effective move"] },
+      { "id": "chapter3-p37-right", "anchors": ["healthy extra pawn", "Black still cannot take"] },
+      { "id": "chapter3-p38-left", "anchors": ["A2)", "very risky for Black"] },
+      { "id": "chapter3-p38-right", "anchors": ["Black faces serious problems", "White wins the pawn"] },
+      { "id": "chapter3-p39-left", "anchors": ["clearly in White's favour", "winning idea"] },
+      { "id": "chapter3-p39-right", "anchors": ["natural improvement", "pleasant positional edge"] },
+      { "id": "chapter3-p40-left", "anchors": ["only one game", "advantage in development"] },
+      { "id": "chapter3-p40-right", "anchors": ["better positionally", "different approach"] },
+      { "id": "chapter3-p41-left", "anchors": ["good illustrative line", "Catalan bishop"] },
+      { "id": "chapter3-p41-right", "anchors": ["two knight moves", "critical continuation"] },
+      { "id": "chapter3-p42-left", "anchors": ["welcome tactical resource", "extra pawn"] },
+      { "id": "chapter3-p42-right", "anchors": ["winning attack", "point behind White's play"] },
+      { "id": "chapter3-p43-left", "anchors": ["dangerous passed pawn", "most solid response"] },
+      { "id": "chapter3-p43-right", "anchors": ["clear positional advantage", "problem for Black"] },
+      { "id": "chapter3-p44-left", "anchors": ["clearly better positionally", "dangerous initiative"] },
+      { "id": "chapter3-p44-right", "anchors": ["regained the pawn", "best way to defend"] },
+      { "id": "chapter3-p45-left", "anchors": ["natural attempt", "accurate move"] },
+      { "id": "chapter3-p45-right", "anchors": ["White should have continued", "most recent trend"] },
+      { "id": "chapter3-p46-left", "anchors": ["exchange sacrifice", "typical Catalan pull"] },
+      { "id": "chapter3-p46-right", "anchors": ["excellent compensation", "more active game"] },
+      { "id": "chapter3-p47-left", "anchors": ["strong idea", "almost forced play"] },
+      { "id": "chapter3-p47-right", "anchors": ["block the", "doesn't have an alternative"] },
+      { "id": "chapter3-p48-left", "anchors": ["entirely refuted", "correspondence games"] },
+      { "id": "chapter3-p48-right", "anchors": ["brilliant idea", "most stubborn try"] },
+      { "id": "chapter3-p49-left", "anchors": ["amazing winning line", "cannot avoid mate"] },
+      { "id": "chapter3-p49-right", "anchors": ["obvious alternative", "tactical idea"] },
+      { "id": "chapter3-p50-left", "anchors": ["looks to be winning", "decisive advantage"] },
+      { "id": "chapter3-p50-right", "anchors": ["Conclusion", "powerful exchange sacrifice"] }
+    ]
+  },
+  "evidence": { "pageCount": 17, "diagramCount": 44, "strictDirectory": true, "inventorySha256": "364FAF7DD14FDFFE353B59DDA693452C6DB88EDEAD4D41E3A6666F4A7C34A0D0" }
+}

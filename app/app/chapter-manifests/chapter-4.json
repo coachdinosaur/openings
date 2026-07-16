@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": 4,
+  "source": {
+    "filename": "Chapter4_Catalan.pdf",
+    "sha256": "81A467F058A1AB088F6548A81304450A1FEC00EEC9FC0CFE830E826B5CD22587",
+    "pdfPageCount": 12,
+    "printedStart": 51,
+    "printedEnd": 62
+  },
+  "lesson": {
+    "expectedCanonicalHash": "3C2BB1178E583D92E126AF158BF2EFF40F0DB873F4F5E2F0320213284564A4CA",
+    "defaultPosition": { "lineId": "ch4-opening", "ply": 11 }
+  },
+  "review": { "storageKey": "catalan-chapter-4-review-v1", "schemaVersion": 2 },
+  "verification": {
+    "regions": [
+      { "id": "chapter4-p51-full", "anchors": ["Variation Index", "D22)"] },
+      { "id": "chapter4-p52-left", "anchors": ["Black's idea is simple", "popular choice"] },
+      { "id": "chapter4-p52-right", "anchors": ["character of the game", "long-term pressure"] },
+      { "id": "chapter4-p53-left", "anchors": ["Black never has an easy life", "big change"] },
+      { "id": "chapter4-p53-right", "anchors": ["pleasant edge", "original novelty"] },
+      { "id": "chapter4-p54-left", "anchors": ["key move", "extra pawn"] },
+      { "id": "chapter4-p54-right", "anchors": ["works well for White", "pleasant edge"] },
+      { "id": "chapter4-p55-left", "anchors": ["extra tempo", "positional pull"] },
+      { "id": "chapter4-p55-right", "anchors": ["queenside castling", "king issue"] },
+      { "id": "chapter4-p56-left", "anchors": ["big change", "old and well-known line"] },
+      { "id": "chapter4-p56-right", "anchors": ["positional edge", "dubious"] },
+      { "id": "chapter4-p57-left", "anchors": ["powerful continuation", "at least a pawn"] },
+      { "id": "chapter4-p57-right", "anchors": ["opportune moment", "obvious advantage"] },
+      { "id": "chapter4-p58-left", "anchors": ["planning to regain the pawn", "new proposal"] },
+      { "id": "chapter4-p58-right", "anchors": ["avoid the queen swap", "compensation is obvious"] },
+      { "id": "chapter4-p59-left", "anchors": ["This position has been contested", "highest level"] },
+      { "id": "chapter4-p59-right", "anchors": ["detailed investigation", "play actively"] },
+      { "id": "chapter4-p60-left", "anchors": ["forcing sequence", "double-edged endgame"] },
+      { "id": "chapter4-p60-right", "anchors": ["interesting idea", "slight pull"] },
+      { "id": "chapter4-p61-left", "anchors": ["most convincing", "light-squared bishop"] },
+      { "id": "chapter4-p61-right", "anchors": ["winning chances", "easy draw"] },
+      { "id": "chapter4-p62-left", "anchors": ["dxe6", "fxe6"] },
+      { "id": "chapter4-p62-right", "anchors": ["Conclusion", "significant changes"] }
+    ]
+  },
+  "evidence": { "pageCount": 12, "diagramCount": 33, "strictDirectory": true, "inventorySha256": "F32C228291EA934D0B44EF3CA433B68AAF85A754520FD1220DDE75E37ED29313" }
+}

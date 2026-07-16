@@ -11,6 +11,7 @@ async function loadClientModule() {
   let output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText;
+  output = output.replace(/from ["']chess\.js["']/, `from ${JSON.stringify(import.meta.resolve("chess.js"))}`);
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 

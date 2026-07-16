@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": 11,
+  "compatibility": "chapter1-legacy",
+  "source": {
+    "filename": "Chapter11_Catalan.pdf",
+    "sha256": "25F8A3ED3414121CEE80142543372EB72D62B4E114BE5F350DAB0FDAAE2AF0B7",
+    "pdfPageCount": 23,
+    "printedStart": 1,
+    "printedEnd": 23
+  },
+  "lesson": {
+    "expectedCanonicalHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "defaultPosition": {
+      "lineId": "ch11-fen-1",
+      "ply": 0
+    }
+  },
+  "review": {
+    "storageKey": "catalan-b2-review-chapter-11",
+    "schemaVersion": 3
+  },
+  "verification": {
+    "regions": []
+  },
+  "evidence": {
+    "pageCount": 23,
+    "diagramCount": 0,
+    "strictDirectory": false,
+    "inventorySha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": 9,
+  "source": {
+    "filename": "Chapter9_Catalan.pdf",
+    "sha256": "2CE209B77AB517583F50BE6C470548C44BA4C6D831C86828C39D9E905542BF3B",
+    "pdfPageCount": 8,
+    "printedStart": 126,
+    "printedEnd": 133
+  },
+  "lesson": {
+    "publicationProfile": "authored",
+    "expectedCanonicalHash": "8F684005F673E2C0758782A8E7F893DD56452C3D31C83BFF0C47626C1017E891",
+    "defaultPosition": {
+      "lineId": "ch9-opening",
+      "ply": 0
+    }
+  },
+  "review": {
+    "storageKey": "catalan-chapter-9-review-v1",
+    "schemaVersion": 3
+  },
+  "verification": {
+    "regions": [
+      { "id": "chapter9-p126-full", "anchors": ["Variation Index", "note to"] },
+      { "id": "chapter9-p127-left", "anchors": ["defends his extra pawn", "Once again this is the correct move order"] },
+      { "id": "chapter9-p127-right", "anchors": ["8.tlie5 tlid5", "Before striking in the centre"] },
+      { "id": "chapter9-p128-left", "anchors": ["Black's only choice", "regaining the pawn"] },
+      { "id": "chapter9-p128-right", "anchors": ["huge advantage", "must also consider"] },
+      { "id": "chapter9-p129-left", "anchors": ["continuation 1 3 .d5", "Black will not be able"] },
+      { "id": "chapter9-p129-right", "anchors": ["A nice idea", "advantage is decisive"] },
+      { "id": "chapter9-p130-left", "anchors": ["14.dxe6N Surprisingly", "It's curtains for Black"] },
+      { "id": "chapter9-p130-right", "anchors": ["14 .. . hdS", "doesn't change a lot"] },
+      { "id": "chapter9-p131-left", "anchors": ["only helps White", "obligatory move for White"] },
+      { "id": "chapter9-p131-right", "anchors": ["familiar theme", "26.i>g2±"] },
+      { "id": "chapter9-p132-left", "anchors": ["clearly better", "overcoming his difficulties"] },
+      { "id": "chapter9-p132-right", "anchors": ["unable to avoid material losses", "sufficient compensation for a pawn"] },
+      { "id": "chapter9-p133-left", "anchors": ["full compensation for the pawn", "a3"] },
+      { "id": "chapter9-p133-right", "anchors": ["Conclusion", "hope the reader will"] }
+    ]
+  },
+  "evidence": {
+    "pageCount": 8,
+    "diagramCount": 22,
+    "strictDirectory": true,
+    "inventorySha256": "B228FC4709274AF7602CE39D20717853EF200CA9B167B54FFEAB9DFA6B4449BC"
+  }
+}

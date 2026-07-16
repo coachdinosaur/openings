@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": 1,
+  "compatibility": "chapter1-legacy",
+  "source": {
+    "filename": "Chapter1_Catalan.pdf",
+    "sha256": "3F6E9E6C1DCDAE42D0AC67417924B5D118B30F1536706B847D488D1908681E8A",
+    "pdfPageCount": 17,
+    "printedStart": 8,
+    "printedEnd": 23
+  },
+  "lesson": {
+    "expectedCanonicalHash": "D90B417587DAE62506F81E3FE39B05E19DD3B2794704796389B3403EEB1A3461",
+    "defaultPosition": { "lineId": "chapter-start", "ply": 7 }
+  },
+  "review": { "storageKey": "catalan-b2-review-v2", "schemaVersion": 2 },
+  "verification": {
+    "regions": [
+      { "id": "chapter1-p13-left-b2", "anchors": ["B2)", "This seems like the only move", "9.e4"] },
+      { "id": "chapter1-p13-right-b2", "anchors": ["The only serious alternative", "This new move", "Another interesting continuation"] },
+      { "id": "chapter1-p14-left-b2", "anchors": ["seems less convincing", "leaves White strongly centralized"] }
+    ]
+  },
+  "evidence": { "pageCount": 16, "diagramCount": 28, "strictDirectory": false, "inventorySha256": "A8E5EDAC9AD7295FF26274CC1C9D44B27398DE48FC71D1FC13A9E69742809061" }
+}
