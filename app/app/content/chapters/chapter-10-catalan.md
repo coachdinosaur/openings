@@ -16,18 +16,18 @@
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.0-0 Nc6  
 7.e3
 
-A) 7...Nd5 — 135  
-B) 7...Rb8 8.Nfd2 — 136  
-&nbsp;&nbsp;&nbsp;&nbsp;B1) 8...Qd7 — 136  
-&nbsp;&nbsp;&nbsp;&nbsp;B2) 8...e5 9.Bxc6+ bxc6 10.dxe5 Ng4 11.Nxc4 Be6 12.Nbd2 — 138  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B21) 12...h5 — 139  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B22) 12...Bb4 — 139  
-C) 7...Bd7 8.Qe2 b5 9.b3!? cxb3 10.axb3 — 140  
-&nbsp;&nbsp;&nbsp;&nbsp;C1) 10...Bb4 — 141  
-&nbsp;&nbsp;&nbsp;&nbsp;C2) 10...Be7 — 141  
-&nbsp;&nbsp;&nbsp;&nbsp;C3) 10...Bd6 11.Bb2 0-0 12.Rc1 — 143  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C31) 12...Nb4 — 144  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C32) 12...Nd5 — 144
+- A) 7...Nd5 — 135
+- B) 7...Rb8 8.Nfd2 — 136
+  - B1) 8...Qd7 — 136
+  - B2) 8...e5 9.Bxc6+ bxc6 10.dxe5 Ng4 11.Nxc4 Be6 12.Nbd2 — 138
+    - B21) 12...h5 — 139
+    - B22) 12...Bb4 — 139
+- C) 7...Bd7 8.Qe2 b5 9.b3!? cxb3 10.axb3 — 140
+  - C1) 10...Bb4 — 141
+  - C2) 10...Be7 — 141
+  - C3) 10...Bd6 11.Bb2 0-0 12.Rc1 — 143
+    - C31) 12...Nb4 — 144
+    - C32) 12...Nd5 — 144
 
 ---
 

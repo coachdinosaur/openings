@@ -17,26 +17,26 @@
 
 6.Qa4
 
-A) 6...Bd6 — 147  
-B) 6...Bd7 7.Qxc4 Na5 8.Qd3 c5 9.O-O — 148  
-&nbsp;&nbsp;&nbsp;&nbsp;B1) 9...Qb6 — 148  
-&nbsp;&nbsp;&nbsp;&nbsp;B2) 9...Rc8 — 149  
-&nbsp;&nbsp;&nbsp;&nbsp;B3) 9...Bc6 10.Nc3 — 150  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B31) 10...cxd4 — 151  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B32) 10...Be7 — 153  
-C) 6...Nd7 7.Qxc4 Nb6 8.Qb5! — 154  
-&nbsp;&nbsp;&nbsp;&nbsp;C1) 8...Bb4+ — 155  
-&nbsp;&nbsp;&nbsp;&nbsp;C2) 8...Bd7 — 156  
-&nbsp;&nbsp;&nbsp;&nbsp;C3) 8...a6 9.Qd3 — 157  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C31) 9...Nb4 — 157  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C32) 9...e5 — 158  
-D) 6...Bb4+ 7.Bd2 — 160  
-&nbsp;&nbsp;&nbsp;&nbsp;D1) 7...Bd6 8.Na3 — 160  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D11) 8...Ne4 — 161  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D12) 8...Bxa3 — 162  
-&nbsp;&nbsp;&nbsp;&nbsp;D2) 7...Nd5 8.Qb5!? — 164  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D21) 8...O-O — 164  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D22) 8...Bxd2+ — 165
+- A) 6...Bd6 — 147
+- B) 6...Bd7 7.Qxc4 Na5 8.Qd3 c5 9.O-O — 148
+  - B1) 9...Qb6 — 148
+  - B2) 9...Rc8 — 149
+  - B3) 9...Bc6 10.Nc3 — 150
+    - B31) 10...cxd4 — 151
+    - B32) 10...Be7 — 153
+- C) 6...Nd7 7.Qxc4 Nb6 8.Qb5! — 154
+  - C1) 8...Bb4+ — 155
+  - C2) 8...Bd7 — 156
+  - C3) 8...a6 9.Qd3 — 157
+    - C31) 9...Nb4 — 157
+    - C32) 9...e5 — 158
+- D) 6...Bb4+ 7.Bd2 — 160
+  - D1) 7...Bd6 8.Na3 — 160
+    - D11) 8...Ne4 — 161
+    - D12) 8...Bxa3 — 162
+  - D2) 7...Nd5 8.Qb5!? — 164
+    - D21) 8...O-O — 164
+    - D22) 8...Bxd2+ — 165
 
 ---
 

@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
+    "clean": "node -e \"const fs=require('fs');for(const d of ['.vinext','dist','.wrangler']){fs.rmSync(d,{recursive:true,force:true});}\"",
     "postinstall": "node scripts/patch-vinext-static.mjs",
     "chapters:status": "node scripts/chapter-system.mjs status",
     "chapters:sync": "node scripts/chapter-system.mjs sync",
@@ -23,7 +24,7 @@
     "chapters:validate-lesson": "tsx scripts/validate-chapter-lesson.ts",
     "chapters:verify-import": "tsx scripts/verify-chapter-import.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run chapters:check && npm run typecheck && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs tests/chapter-workflow.test.mjs && tsx --test tests/chapter-system.test.ts",
+    "test": "npm run chapters:check && npm run typecheck && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs tests/chapter-workflow.test.mjs && tsx --test tests/chapter-system.test.ts tests/interactive-moves.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

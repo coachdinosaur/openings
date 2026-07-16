@@ -11,6 +11,11 @@ import type { DiagramLink, LessonDocument, MoveReference, ReviewItem, ReviewOver
 import { legalTargets, playAnalysisMove } from "./board-analysis";
 import type { AnalysisMove, BoardMoveInput, PromotionPiece } from "./board-analysis";
 import type { AnalysisUpdate, EnginePhase, EngineScore, StockfishClient, StockfishEvent } from "./stockfish-client";
+import { compileInteractiveMoves } from "./lib/interactive-moves";
+import type { InteractiveMoveEntry } from "./lib/interactive-moves";
+import { MarkdownChapterView } from "./components/MarkdownRenderer";
+
+const MARKDOWN_CHAPTER_IDS = new Set(["9", "10", "11"]);
 
 type View = "lesson" | "review" | "import";
 type ActivePosition = { lineId: string; ply: number };
@@ -19,6 +24,7 @@ type ReviewTab = "text" | "moves" | "boards";
 const LEGACY_REVIEW_KEY = "catalan-b2-review-v1";
 const EDITOR_KEY = "catalan-editor-mode-v1";
 const CHAPTER_NAVIGATION_PAINT_DELAY_MS = 120;
+const INTERACTIVE_MOVE_CHAPTER_IDS = new Set(["10", "11"]);
 
 const lessonLineIndexes = new WeakMap<LessonDocument, Map<string, VariationNode>>();
 const lessonSpanIndexes = new WeakMap<LessonDocument, Map<string, LessonDocument["sourceSpans"][number]>>();
@@ -334,6 +340,40 @@ function RichText({ lesson, text, refs = [], overlay, onMove }: { lesson: Lesson
   return <>{output}</>;
 }
 
+function InteractiveRichText({ text, entries, onMove }: { text: string; entries: InteractiveMoveEntry[]; onMove: (fen: string) => void }): ReactNode {
+  if (!entries.length) return <>{text}</>;
+  const output: ReactNode[] = [];
+  let cursor = 0;
+  const remaining = [...entries];
+
+  for (const match of text.matchAll(SOURCE_MOVE_TOKEN)) {
+    const at = match.index ?? 0;
+    const source = match[0].trim();
+    if (!source) continue;
+    const bare = source.replace(/^\d+\.(?:\.\.)?\s*/, "");
+    if (/^[a-h][1-8]$/.test(bare)) {
+      const prefix = text.slice(Math.max(0, at - 8), at).toLowerCase();
+      if (/(?:^|\s)(?:on|to|the|a|toward) $/.test(prefix)) continue;
+      if (text.slice(at + source.length, at + source.length + 7).toLowerCase().startsWith("-square")) continue;
+    }
+    const entryIdx = remaining.findIndex((e) => e.displayText === source);
+    if (entryIdx === -1) continue;
+    const entry = remaining.splice(entryIdx, 1)[0];
+    if (at > cursor) output.push(<>{text.slice(cursor, at)}</>);
+    const ply = entry.ply;
+    output.push(<button
+      type="button"
+      key={`im-${ply}`}
+      className="inline-move interactive-move"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMove(entry.resultingFen); }}
+      aria-label={`Show position after ${source}`}
+    >{source}</button>);
+    cursor = at + match[0].length;
+  }
+  output.push(<>{text.slice(cursor)}</>);
+  return <>{output}</>;
+}
+
 function sourceEvidenceCrop(span: LessonDocument["sourceSpans"][number]): string {
   const chapterMatch = /^\/source\/(chapter[78])\/pages\/printed-\d+\.png$/.exec(span.crop);
   return chapterMatch ? `/source/${chapterMatch[1]}/regions/printed-${span.printedPage}-${span.column}.png` : span.crop;
@@ -360,24 +400,31 @@ function DiagramCard({ diagram, overlay, onJump, compact = false }: { diagram: D
   </article>;
 }
 
-const Narrative = memo(function Narrative({ lesson, overlay, onMove, onJump, containerRef }: { lesson: LessonDocument; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void; onJump: (diagram: DiagramLink) => void; containerRef: RefObject<HTMLElement | null> }) {
+type BlockInteractiveData = { startingFen: string; entries: InteractiveMoveEntry[] };
+
+const Narrative = memo(function Narrative({ lesson, overlay, onMove, onJump, containerRef, interactiveData, onInteractiveMove }: { lesson: LessonDocument; overlay: ReviewOverlay; onMove: (lineId: string, moveIndex: number) => void; onJump: (diagram: DiagramLink) => void; containerRef: RefObject<HTMLElement | null>; interactiveData?: Map<string, BlockInteractiveData>; onInteractiveMove?: (fen: string) => void }) {
   return <article ref={containerRef} className="narrative" aria-label={`Complete ${lesson.title} source text`}>
     {lesson.blocks.map((block, index) => {
       const previousSpan = lesson.blocks[index - 1]?.sourceSpanId;
       const region = block.sourceSpanId !== previousSpan ? <SourceRegion lesson={lesson} spanId={block.sourceSpanId} /> : null;
       const item = overlay.items[block.id];
       const text = item?.decision === "accepted" && item.correctedText !== undefined ? item.correctedText : "text" in block ? block.text : "";
+      const blockInteractive = interactiveData?.get(block.id);
+      const renderInteractive = blockInteractive && onInteractiveMove;
+      const textRichText = (text: string, refs?: MoveReference[]) => renderInteractive
+        ? <InteractiveRichText text={text} entries={blockInteractive.entries} onMove={onInteractiveMove} />
+        : <RichText lesson={lesson} text={text} refs={refs} overlay={overlay} onMove={onMove} />;
       let content: ReactNode;
-      if (block.type === "heading") content = <h2 className="source-heading"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></h2>;
+      if (block.type === "heading") content = <h2 className="source-heading">{textRichText(text, block.moveRefs)}</h2>;
       else if (block.type === "diagram") {
         const diagram = diagramById(lesson, block.diagramId);
         content = <DiagramCard diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />;
       } else if (block.type === "variation") {
         const diagram = block.diagramId ? diagramById(lesson, block.diagramId) : null;
-        content = <details open className="variation-card"><summary><span>Source variation</span><strong>{block.title}</strong></summary><div className="variation-body"><p><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />}</div></details>;
-      } else if (block.type === "move-sequence") content = <div className="main-move-block"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></div>;
-      else if (block.type === "assessment") content = <blockquote className="final-assessment"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></blockquote>;
-      else content = <p className="lesson-prose"><RichText lesson={lesson} text={text} refs={block.moveRefs} overlay={overlay} onMove={onMove} /></p>;
+        content = <details open className="variation-card"><summary><span>Source variation</span><strong>{block.title}</strong></summary><div className="variation-body"><p>{textRichText(text, block.moveRefs)}</p>{diagram && <DiagramCard compact diagram={diagram} overlay={overlay} onJump={() => onJump(diagram)} />}</div></details>;
+      } else if (block.type === "move-sequence") content = <div className="main-move-block">{textRichText(text, block.moveRefs)}</div>;
+      else if (block.type === "assessment") content = <blockquote className="final-assessment">{textRichText(text, block.moveRefs)}</blockquote>;
+      else content = <p className="lesson-prose">{textRichText(text, block.moveRefs)}</p>;
       return <div className="narrative-block" data-block-id={block.id} key={block.id}>{region}{content}</div>;
     })}
   </article>;
@@ -399,11 +446,14 @@ const INITIAL_ENGINE_PHASE: EnginePhase = "uninitialized";
 
 function LessonView({ config, overlay }: { config: ChapterConfig; overlay: ReviewOverlay }) {
   const { lesson } = config;
+  const enableClickableMoves = INTERACTIVE_MOVE_CHAPTER_IDS.has(config.id);
   const [active, setActive] = useState<ActivePosition>(config.defaultPosition);
   const [flipped, setFlipped] = useState(false);
+  const [selectedFen, setSelectedFen] = useState<string | null>(null);
+  const interactiveMoveData = useMemo(() => enableClickableMoves ? compileInteractiveMoves(lesson) : null, [enableClickableMoves, lesson]);
   const position = useMemo(() => positionFor(lesson, active, overlay), [lesson, active, overlay]);
   const [analysisMoves, setAnalysisMoves] = useState<AnalysisMove[]>([]);
-  const displayedFen = analysisMoves.length ? analysisMoves[analysisMoves.length - 1].fen : position.fen;
+  const displayedFen = selectedFen ?? (analysisMoves.length ? analysisMoves[analysisMoves.length - 1].fen : position.fen);
   const lastAnalysisMove = analysisMoves.length ? analysisMoves[analysisMoves.length - 1] : null;
   const [enginePhase, setEnginePhase] = useState<EnginePhase>(INITIAL_ENGINE_PHASE);
   const [engineAnalysis, setEngineAnalysis] = useState<AnalysisUpdate | null>(null);
@@ -423,6 +473,7 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
     setEngineAnalysis(null);
     setAnalysisMoves([]);
     setActive(value);
+    setSelectedFen(null);
   }, []);
   const applyAnalysisMove = useCallback((input: BoardMoveInput) => {
     const move = playAnalysisMove(displayedFen, input);
@@ -446,6 +497,9 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
     if (diagram.lineId === null || diagram.moveIndex === null) setActivePosition(config.defaultPosition);
     else selectMove(diagram.lineId, diagram.moveIndex);
   }, [config.defaultPosition, selectMove, setActivePosition]);
+  const handleInteractiveMove = useCallback((fen: string) => {
+    setSelectedFen(fen);
+  }, []);
 
   const setEngineFailure = useCallback((error: unknown) => {
     if (!mountedRef.current) return;
@@ -536,8 +590,8 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      if (event.key === "ArrowRight") setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId).length, value.ply + 1) }));
-      if (event.key === "ArrowLeft") setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) }));
+      if (event.key === "ArrowRight") { setSelectedFen(null); setActivePosition((value) => ({ ...value, ply: Math.min(linePath(lesson, value.lineId).length, value.ply + 1) })); }
+      if (event.key === "ArrowLeft") { setSelectedFen(null); setActivePosition((value) => ({ ...value, ply: Math.max(0, value.ply - 1) })); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -636,7 +690,9 @@ function LessonView({ config, overlay }: { config: ChapterConfig; overlay: Revie
         </div>
         <div className="active-line"><span>{analysisMoves.length ? "Analysis from" : "Active line"}</span><strong>{lineById(lesson, active.lineId).label}</strong>{analysisMoves.length > 0 && <small>{analysisMoves.length} exploratory {analysisMoves.length === 1 ? "move" : "moves"}; lesson source remains unchanged.</small>}{!position.valid && <small>Manual SAN correction is not legal; showing verified baseline position.</small>}</div>
       </aside>
-      <Narrative lesson={lesson} overlay={overlay} onMove={selectMove} onJump={jumpDiagram} containerRef={narrativeRef} />
+      {MARKDOWN_CHAPTER_IDS.has(config.id)
+        ? <MarkdownChapterView chapterId={config.id} onMove={handleInteractiveMove} />
+        : <Narrative lesson={lesson} overlay={overlay} onMove={selectMove} onJump={jumpDiagram} containerRef={narrativeRef} interactiveData={interactiveMoveData ?? undefined} onInteractiveMove={handleInteractiveMove} />}
     </section>
   </main>;
 }

@@ -288,6 +288,12 @@ input.invalid { border-color: #c44b42; }
 .inline-move { display: inline; margin: 0; padding: 1px 4px; border: 0; border-radius: 5px; color: var(--forest-2); background: rgba(36,101,84,.09); font: inherit; font-weight: 750; text-decoration: none; }
 .inline-move.unresolved { color: #8b6526; background: rgba(183,139,47,.16); }
 .inline-move:hover, .inline-move.active { color: #fff; background: var(--forest-2); }
+.interactive-move { cursor: pointer; }
+.interactive-move:focus-visible { outline: 2px solid var(--forest-2); outline-offset: 1px; }
+.fen-block { margin: 16px 0; padding: 12px; border: 1px solid #cbd7d0; border-radius: 12px; background: #eef3ee; }
+.fen-board-container { width: min(280px, 100%); margin: 8px 0; }
+.fen-board-container .board-frame { padding: 8px; border-radius: 11px; }
+.fen-string { display: block; margin-top: 8px; font-size: 11px; color: #5b6b63; word-break: break-all; }
 .variation-card { margin: 15px 0 24px; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
 .variation-card > summary { display: grid; grid-template-columns: auto 1fr; gap: 3px 11px; padding: 16px 18px; cursor: pointer; list-style: none; }
 .variation-card > summary::-webkit-details-marker { display: none; }
