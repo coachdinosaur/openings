@@ -70,7 +70,7 @@ function auditMarkdown(markdown: string) {
 }
 
 test("every published Markdown chapter contains navigable move lines", async () => {
-  for (let chapter = 1; chapter <= 11; chapter++) {
+  for (let chapter = 1; chapter <= 12; chapter++) {
     const markdown = await readFile(new URL(`../app/content/chapters/chapter-${chapter}-catalan.md`, import.meta.url), "utf8");
     const audit = auditMarkdown(markdown);
     assert.ok(audit.total >= 25, `Chapter ${chapter} should contain substantial chess notation`);
@@ -197,12 +197,14 @@ test("the active Markdown move stays marked while arrow navigation walks its lin
   assert.doesNotMatch(html, /class="inline-move interactive-move active"[^>]*>Nf6<\/button>/);
 });
 
-test("Chapters 1-8 expose every PDF diagram as a visible FEN board", async () => {
-  const expectedDiagramCounts = [47, 25, 44, 33, 32, 43, 73, 37];
+test("source-audited chapters expose every PDF diagram as a visible FEN board", async () => {
+  const expectedDiagramCounts = new Map([
+    [1, 47], [2, 25], [3, 44], [4, 33], [5, 32], [6, 43], [7, 73], [8, 37], [12, 34],
+  ]);
 
-  for (let chapter = 1; chapter <= 8; chapter++) {
+  for (const [chapter, expectedCount] of expectedDiagramCounts) {
     const markdown = await readFile(new URL(`../app/content/chapters/chapter-${chapter}-catalan.md`, import.meta.url), "utf8");
     const visibleDiagrams = markdown.match(/^\*\*FEN:\*\*/gm) ?? [];
-    assert.equal(visibleDiagrams.length, expectedDiagramCounts[chapter - 1], `Chapter ${chapter} PDF diagram count`);
+    assert.equal(visibleDiagrams.length, expectedCount, `Chapter ${chapter} PDF diagram count`);
   }
 });

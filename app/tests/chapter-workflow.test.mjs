@@ -5,11 +5,11 @@ import { catalogSource, discoverChapters, parseChapterMarkdown } from "../script
 
 test("discovers one contiguous Markdown catalog", async () => {
   const chapters = await discoverChapters();
-  assert.deepEqual(chapters.map((chapter) => chapter.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  assert.deepEqual(chapters.map((chapter) => chapter.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.ok(chapters.every((chapter) => chapter.pageCount > 0));
   assert.ok(chapters.every((chapter) => chapter.visibleFenCount > 0));
   const catalog = catalogSource(chapters);
-  assert.match(catalog, /CHAPTER_IDS = \["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"\]/);
+  assert.match(catalog, /CHAPTER_IDS = \["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"\]/);
   assert.doesNotMatch(catalog, /chapter-packages|manifest|pdfjs|sourcePdf/);
 });
 

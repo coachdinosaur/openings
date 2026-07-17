@@ -12,10 +12,11 @@ async function render(path = "/") {
 }
 
 test("publishes all Markdown chapters through one learner route", async () => {
-  const responses = await Promise.all([render("/"), render("/chapters/1"), render("/chapters/9"), render("/chapters/11")]);
+  const responses = await Promise.all([render("/"), render("/chapters/1"), render("/chapters/9"), render("/chapters/11"), render("/chapters/12")]);
   assert.ok(responses.every((response) => response.status === 200));
   assert.match(await responses[1].text(), /aria-label="Chapter page 7, 1 of 17"/, "chapters should open on their first source page in the lightweight reader");
-  assert.equal((await render("/chapters/12")).status, 404);
+  assert.match(await responses[4].text(), /aria-label="Chapter page 1, 1 of 11"/, "Chapter 12 should open on its variation index");
+  assert.equal((await render("/chapters/13")).status, 404);
   assert.equal((await render("/chapters/1/review")).status, 404);
   assert.equal((await render("/chapters/1/import")).status, 404);
 });
@@ -36,9 +37,9 @@ test("the application is Markdown-first and has no runtime PDF conversion surfac
   assert.doesNotMatch(`${app}\n${packageJson}`, /pdfjs-dist|extractLessonRegions|ImportView|ReviewView|uploaded_pdf/);
 });
 
-test("all eleven Markdown source files and core chess assets are packaged", async () => {
+test("all twelve Markdown source files and core chess assets are packaged", async () => {
   const chapterFiles = (await readdir(new URL("app/content/chapters/", root))).filter((name) => /^chapter-\d+-catalan\.md$/.test(name));
-  assert.equal(chapterFiles.length, 11);
+  assert.equal(chapterFiles.length, 12);
   await Promise.all([
     access(new URL("public/assets/pieces/mpchess/wK.svg", root)),
     access(new URL("public/assets/pieces/mpchess/bQ.svg", root)),

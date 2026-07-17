@@ -17,16 +17,14 @@
 
 5.Bd2
 
-A) 5...c5 — 170
-
-B) 5...Bxd2+ 6.Nbxd2 0-0 7.Bg2 — 171  
-&nbsp;&nbsp;&nbsp;&nbsp;B1) 7...Qe7 — 171  
-&nbsp;&nbsp;&nbsp;&nbsp;B2) 7...b6 — 173  
-&nbsp;&nbsp;&nbsp;&nbsp;B3) 7...c6 — 174
-
-C) 5...Bd6 6.Nc3! — 176  
-&nbsp;&nbsp;&nbsp;&nbsp;C1) 6...c6 — 176  
-&nbsp;&nbsp;&nbsp;&nbsp;C2) 6...0-0 — 178
+- A) 5...c5 — 170
+- B) 5...Bxd2+ 6.Nbxd2 0-0 7.Bg2 — 171
+  - B1) 7...Qe7 — 171
+  - B2) 7...b6 — 173
+  - B3) 7...c6 — 174
+- C) 5...Bd6 6.Nc3! — 176
+  - C1) 6...c6 — 176
+  - C2) 6...0-0 — 178
 
 ---
 
