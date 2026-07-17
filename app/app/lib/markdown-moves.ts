@@ -155,7 +155,10 @@ export class MarkdownMoveResolver {
       if (!display || isLikelyProseSquare(text, at, display)) continue;
 
       const numberedKey = moveNumberKey(display);
-      const indexedHistory = numberedKey ? [...(this.historyByMove.get(numberedKey) ?? [])].reverse() : [];
+      // A parenthetical variation has one explicit branch point. Searching old
+      // history from inside it can attach a later move to the main line when
+      // the variation's first move is invalid or anchored incorrectly.
+      const indexedHistory = numberedKey && depth === 0 ? [...(this.historyByMove.get(numberedKey) ?? [])].reverse() : [];
       const candidates = uniqueCandidates([active, ...indexedHistory]);
       let resolved: PositionPath | null = null;
       let before: PositionPath | null = null;
@@ -169,7 +172,7 @@ export class MarkdownMoveResolver {
           steps: [...candidate.steps, { fen: move.fen, label: display }],
         } });
       }
-      if (numberedKey) {
+      if (numberedKey && depth === 0) {
         const rootCandidates = this.knownMoveIndex.get(`${numberedKey}\u0000${normalizeSan(display)}`) ?? [];
         for (const candidate of rootCandidates) {
           legalCandidates.push({

@@ -69,6 +69,29 @@ function auditMarkdown(markdown: string) {
   return { total, resolved, longestLine };
 }
 
+function tokensForExactLine(markdown: string, exactLine: string) {
+  const resolver = new MarkdownMoveResolver();
+  extractFenBlocks(markdown).forEach(({ fen }, fenIndex) => resolver.addRoot(fen, `Chapter position ${fenIndex + 1}`));
+  const lines = markdown.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index++) {
+    const trimmed = lines[index].trim();
+    const hidden = /^<!--\s*FEN:\s*([^>]+?)\s*-->$/.exec(trimmed);
+    if (hidden) {
+      resolver.setAnchor(hidden[1].trim());
+      continue;
+    }
+    if (trimmed.startsWith("**FEN:**")) {
+      const visible = /^`([^`]+)`$/.exec(lines[index + 1]?.trim() ?? "");
+      if (visible) resolver.setAnchor(visible[1].trim());
+      continue;
+    }
+    if (/^`[^`]+`$/.test(trimmed)) continue;
+    const tokens = resolver.resolveText(lines[index]);
+    if (lines[index] === exactLine) return tokens;
+  }
+  throw new Error(`Line not found: ${exactLine}`);
+}
+
 test("every published Markdown chapter contains navigable move lines", async () => {
   for (let chapter = 1; chapter <= 12; chapter++) {
     const markdown = await readFile(new URL(`../app/content/chapters/chapter-${chapter}-catalan.md`, import.meta.url), "utf8");
@@ -77,6 +100,33 @@ test("every published Markdown chapter contains navigable move lines", async () 
     assert.ok(audit.resolved >= 20, `Chapter ${chapter} should expose navigable moves, received ${audit.resolved}`);
     assert.ok(audit.longestLine >= 3, `Chapter ${chapter} should have a multi-ply navigable line`);
   }
+});
+
+test("Chapter 12 keeps its legal source variations linked on their rendered pages", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-12-catalan.md", import.meta.url), "utf8");
+  const pageAudits = extractPages(markdown).map((page) => auditMarkdown(page.markdown));
+  const total = pageAudits.reduce((sum, audit) => sum + audit.total, 0);
+  const resolved = pageAudits.reduce((sum, audit) => sum + audit.resolved, 0);
+
+  assert.equal(pageAudits.length, 11, "Chapter 12 should retain all source pages");
+  assert.ok(resolved >= 450, `Chapter 12 should expose its anchored legal variations, received ${resolved}/${total}`);
+  assert.ok(resolved / total >= 0.7, `Chapter 12 should keep at least 70% of detected tokens navigable, received ${resolved}/${total}`);
+});
+
+test("Chapter 12 links every move in the 6.cxd5 alternative to 6.Bxb4", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-12-catalan.md", import.meta.url), "utf8");
+  const page = extractPages(markdown).find((candidate) => candidate.number === 2);
+  assert.ok(page);
+  const line = "The alternative **6.cxd5 exd5 7.Bg2 0-0 8.0-0 Nc6** does not give Black as many problems.";
+  const tokens = tokensForExactLine(page.markdown, line);
+  const expected = ["6.cxd5", "exd5", "7.Bg2", "0-0", "8.0-0", "Nc6"];
+
+  assert.deepEqual(tokens.map((token) => token.display), expected);
+  assert.deepEqual(tokens.filter((token) => !token.navigation).map((token) => token.display), [], "every move in the sibling variation must be navigable");
+  assert.deepEqual(tokens.at(-1)?.navigation?.steps.slice(1).map((step) => step.label), expected);
+
+  const html = renderToStaticMarkup(createElement(MarkdownChapterView, { markdown: page.markdown, onMove: () => {} }));
+  for (const move of expected) assert.ok(html.includes(`aria-label="Show position after ${move}"`), `${move} should render as an interactive move button`);
 });
 
 test("a clicked Markdown move carries its complete previous/next navigation path", () => {
@@ -110,6 +160,33 @@ test("numbered sibling variations can return to an older exact branch root", () 
   const alternative = resolver.resolveText("2.Nf3").at(-1)?.navigation;
   assert.ok(alternative, "the move-two sibling should resolve beyond the former three-position history limit");
   assert.equal(alternative.steps.at(-1)?.label, "2.Nf3");
+});
+
+test("an invalid parenthetical branch cannot borrow a later move from the main line", () => {
+  const tokens = new MarkdownMoveResolver().resolveText("1.d4 d5 2.c4 e6 3.Nc3 Nf6 (3...Bc6? 4.Nf3) 4.Nf3");
+  const branchHead = tokens.findIndex((token) => token.display === "3...Bc6?");
+
+  assert.equal(tokens[branchHead]?.navigation, null);
+  assert.equal(tokens[branchHead + 1]?.display, "4.Nf3");
+  assert.equal(tokens[branchHead + 1]?.navigation, null, "the branch move must not be rescued from the Nf6 main line");
+  assert.ok(tokens.at(-1)?.navigation, "the real 4.Nf3 main-line move should remain navigable");
+});
+
+test("Chapter 12 Page 3 keeps 14...Rb8 and 14...Bc6 in separate legal branches", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-12-catalan.md", import.meta.url), "utf8");
+  const page = extractPages(markdown).find((candidate) => candidate.number === 3);
+  assert.ok(page);
+  const line = "**10...N5f6 11.e5 Nd5** occurred in Astrakhantsev – Shutemov, Dagomys 2004, and now **12.Re1N** would have been most accurate. Play may continue **12...b6 13.Ne4 Bb7 14.Nd6 Rb8** (**14...Bc6? 15.Rc1±**) **15.Nd2 cxd4 16.N2c4±** and White remains on top.";
+  const tokens = tokensForExactLine(page.markdown, line);
+  const byDisplay = (display: string) => tokens.find((token) => token.display === display);
+  const labels = (display: string) => byDisplay(display)?.navigation?.steps.map((step) => step.label) ?? [];
+
+  assert.deepEqual(tokens.filter((token) => !token.navigation).map((token) => token.display), [], "every legal move in the paragraph must be navigable");
+  assert.deepEqual(labels("15.Rc1").slice(-2), ["14...Bc6?", "15.Rc1"]);
+  assert.ok(!labels("15.Rc1").includes("Rb8"), "15.Rc1 must not inherit the Rb8 main line");
+  assert.deepEqual(labels("16.N2c4").slice(-4), ["Rb8", "15.Nd2", "cxd4", "16.N2c4"]);
+  assert.ok(!labels("16.N2c4").includes("14...Bc6?"), "the main line must not inherit the Bc6 variation");
+  assert.equal(byDisplay("Rb8")?.navigation?.steps[byDisplay("Rb8")!.navigation!.index + 1]?.label, "15.Nd2");
 });
 
 test("a diagram anchor still permits a numbered opening recap from the initial position", () => {

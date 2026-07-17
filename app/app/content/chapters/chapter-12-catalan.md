@@ -70,6 +70,8 @@ From this position the most common continuation has been **5...Be7**, hoping to 
 
 **5...Qe7** looks odd with the pawn already committed to d5, and after **6.Bg2** Black will probably end up with an inferior version of some other Catalan or Bogo variation.
 
+<!-- FEN: rnbqk2r/ppp2ppp/4pn2/3p4/1bPP4/5NP1/PP1BPP1P/RN1QKB1R b KQkq - 3 5 -->
+
 **5...a5 6.Bg2** transposes exactly to variation C of Chapter 19, although Black can also change directions with **6...dxc4**, in which case we transpose to **4...dxc4 5.Bg2 Bb4+ 6.Bd2 a5**, which was covered in variation D of Chapter 4.
 
 ### A) 5...c5
@@ -78,7 +80,11 @@ This is pretty rare, but it seems quite playable.
 
 ### 6.Bxb4
 
+<!-- FEN: rnbqk2r/pp3ppp/4pn2/2pp4/1bPP4/5NP1/PP1BPP1P/RN1QKB1R w KQkq - 0 6 -->
+
 The alternative **6.cxd5 exd5 7.Bg2 0-0 8.0-0 Nc6** does not give Black as many problems.
+
+<!-- FEN: rnbqk2r/pp3ppp/4pn2/2pp4/1BPP4/5NP1/PP2PP1P/RN1QKB1R b KQkq - 0 6 -->
 
 ### 6...cxb4 7.Nbd2 0-0 8.Bg2
 
@@ -108,16 +114,24 @@ White had a nice positional edge in Sumets – Haroutjunjan, Neustadt an der Wei
 
 **171**
 
+<!-- FEN: r1bq1rk1/p4ppp/1pn1pn2/3p4/1pPP4/5NP1/PP1NPPBP/R2Q1RK1 w - - 0 10 -->
+
 ### 10.Rc1 Bb7 11.e3 a5
+
+<!-- FEN: r2q1rk1/pb3ppp/1pn1pn2/3p4/1pPP4/4PNP1/PP1N1PBP/2RQ1RK1 b - - 0 11 -->
 
 **11...Qd6 12.Qa4 Rfc8 13.Rc2** occurred in Ivanchuk – Gulko, New York 1988. White followed up with **14.Rfc1** and, step by step, Black came under serious pressure.
 
 **FEN:**  
 `r2q1rk1/1b3ppp/1pn1pn2/p2p4/1pPP4/4PNP1/PP1N1PBP/2RQ1RK1 w - - 0 12`
 
+<!-- FEN: r2q1rk1/1b3ppp/1pn1pn2/p2p4/1pPP4/4PNP1/PP1N1PBP/2RQ1RK1 w - - 0 12 -->
+
 **12.cxd5 Nxd5 13.Nc4 Rc8 14.e4 Nf6 15.Nfd2 a6 16.Rfd1 Ne7 17.Ne5±**
 
 White had a pleasant edge, with a better pawn structure and excellent central control in Maiwald – Hertneck, Germany 2013.
+
+<!-- FEN: rnbqk2r/ppp2ppp/4pn2/3p4/1bPP4/5NP1/PP1BPP1P/RN1QKB1R b KQkq - 3 5 -->
 
 ### B) 5...Bxd2+ 6.Nbxd2 0-0 7.Bg2
 
@@ -136,9 +150,13 @@ There is also:
 
 ### 9.cxd5 Nxd5 10.e4
 
+<!-- FEN: rnbr2k1/pp2qppp/4pn2/2pp4/2PP4/5NP1/PPQNPPBP/R4RK1 w - - 0 10 -->
+
 This is more ambitious than **10.dxc5 Nxc5 11.Rc1 b6**, when Black had a decent game in Cheparinov – Naiditsch, Bol 2013.
 
 ### 10...Ne7
+
+<!-- FEN: r1bq1rk1/pp1n1ppp/4p3/2pn4/3PP3/5NP1/PP1N1PBP/R2Q1RK1 b - - 0 10 -->
 
 **10...N5f6 11.e5 Nd5** occurred in Astrakhantsev – Shutemov, Dagomys 2004, and now **12.Re1N** would have been most accurate. Play may continue **12...b6 13.Ne4 Bb7 14.Nd6 Rb8** (**14...Bc6? 15.Rc1±**) **15.Nd2 cxd4 16.N2c4±** and White remains on top.
 
@@ -171,6 +189,8 @@ Another possible set-up is:
 
 This looks a bit too passive, and White should get easy play by carrying out the thematic e2-e4 advance.
 
+<!-- FEN: rnbr2k1/ppp1qppp/4pn2/3p4/2PP4/5NP1/PPQNPPBP/R4RK1 b - - 6 9 -->
+
 I also paid attention to **9...c5 10.cxd5 cxd4 11.Nxd4 Nxd5**, as in Balog – Kosic, Budapest 2009, and now the simple **12.Rfd1N Bd7 13.Nc4 Be8 14.e4 Nb6 15.Na5 Na6 16.a3+=** retains a pleasant edge for White.
 
 ### 10.Rad1 Bd7
@@ -180,6 +200,8 @@ Another good example continued **10...a5 11.Rfe1 Bd7 12.e4 Nb4 13.Qb1 dxc4 14.Nx
 ### 11.a3 a5 12.e4
 
 It is generally not a good sign for Black that White is managing to play e2-e4 so easily.
+
+<!-- FEN: r2r2k1/pp1bqppp/2n1pn2/3p4/1pPPP3/5NP1/PPQN1PBP/3R1RK1 b - - 0 12 -->
 
 ### 12...dxe4 13.Nxe4 Nxe4 14.Qxe4 Rab8 15.Rfe1 Qf6
 
@@ -192,6 +214,8 @@ In Jovanic – Zelcic, Otocac 2010, White could have increased his advantage wit
 
 The difference in piece coordination is obvious.
 
+<!-- FEN: rnb2rk1/p1p1qppp/1p2pn2/3p4/2PP4/5NP1/PP1NPPBP/R2Q1RK1 w - - 0 9 -->
+
 ### 9.Rc1 Bb7
 
 With the bishop committed to b7, this is a good moment for White to remove the tension in the centre.
@@ -201,9 +225,13 @@ With the bishop committed to b7, this is a good moment for White to remove the t
 
 ### 10.cxd5 exd5
 
+<!-- FEN: rn3rk1/pbp1qppp/1p2pn2/3P4/3P4/5NP1/PP1NPPBP/2RQ1RK1 b - - 0 10 -->
+
 **10...Bxd5?! 11.Re1** threatens e2-e4, and after **11...Ne4 12.Nxe4 Bxe4 13.Qa4!±** Black will find it hard to develop the knight from b8.
 
 ### 11.Qa4 c5
+
+<!-- FEN: rn3rk1/p1p1qppp/1p2pn2/3b4/Q2P4/5NP1/PP1NPPBP/2R2RK1 b - - 1 11 -->
 
 After **11...a5?! 12.Rfe1 c6 13.e4! Nxe4 14.Nxe4 dxe4 15.Ne5** White obtained a dangerous initiative thanks to his development advantage in Salov – I. Sokolov, Amsterdam 1996.
 
@@ -222,9 +250,13 @@ We have been following the game Philippeit – Pukropski, email 2010. This would
 
 **173**
 
+<!-- FEN: r1r3k1/pb2qppp/1p3n2/2pp4/3P4/Q5P1/PP1NPPBP/2R1R1K1 w - - 2 16 -->
+
 ### 16.dxc5!N Rxc5
 
 **16...bxc5?** runs into **17.Nb3 Nd7 18.Bh3±** when Black loses at least a pawn.
+
+<!-- FEN: r5k1/pb2qppp/1p3n2/2rp4/8/Q5P1/PP1NPPBP/2R1R1K1 w - - 0 17 -->
 
 ### 17.Rc3 Qf8 18.Rec1 Rxc3 19.Rxc3 Qxa3 20.Rxa3±
 
@@ -265,6 +297,8 @@ I like this aggressive idea, which pretty much forces Black to trade knights.
 
 ### 11...Nxe5
 
+<!-- FEN: rn1q1rk1/pb3ppp/1pp1p3/3n4/1P1P4/5NP1/P1QNPPBP/R4RK1 b - - 1 11 -->
+
 **11...c5?! 12.Nxd7 Nxd7 13.dxc5 bxc5 14.Nb3! c4 15.Nd4** gave White an obvious positional advantage in Mareco – C.E. Toth, Osasco 2012.
 
 ### 12.dxe5 Ng4 13.Nf3 Qe7
@@ -302,9 +336,13 @@ White retains a positional advantage and is ready for **Nd4** next. The followin
 **FEN:**  
 `r4rk1/1b2q1pp/1pp5/pPnpPp2/5P2/6PP/P1NQP1B1/2R2RK1 b - - 2 22`
 
+<!-- FEN: r4rk1/1b2q1pp/1pp5/pPnpPp2/5P2/6PP/P1NQP1B1/2R2RK1 b - - 2 22 -->
+
 **22...cxb5 23.Nxd5+ Bxd5 24.Qxd5+ Kh8 25.Ne3**
 
 White is better thanks to his strong passed pawn and more threatening pawn majority.
+
+<!-- FEN: rnbq1rk1/ppp2ppp/4pn2/3p4/2PP4/5NP1/PP1NPPBP/R2QK2R b KQ - 2 7 -->
 
 ### B3) 7...c6 8.Qc2 Nbd7 9.0-0
 
@@ -323,6 +361,8 @@ This position has occurred in hundreds of games, but once again we will focus on
 
 ### 9...b6
 
+<!-- FEN: r1bq1rk1/pp1n1ppp/2p1pn2/3p4/2PP4/5NP1/PPQNPPBP/R4RK1 b - - 3 9 -->
+
 This seems best. **9...Re8** allows **10.e4** with an easy advantage for White. A good example is: **10...dxe4 11.Nxe4 Nxe4 12.Qxe4 Nf6 13.Qc2 Qe7**
 
 **FEN:**  
@@ -332,9 +372,13 @@ This seems best. **9...Re8** allows **10.e4** with an easy advantage for White. 
 
 Playing against Black’s light-squared bishop is a basic idea in this type of position so, once the opportunity for c4-c5 pops up, I prefer not to wait and give Black a chance to play ...c5 himself. White’s advantage is obvious, and it is not surprising that he has won most of the games from this position.
 
+<!-- FEN: r1bq1rk1/p4ppp/1pn1pn2/3p4/1pPP4/5NP1/PP1NPPBP/R2Q1RK1 w - - 0 10 -->
+
 ### 10.e4 Bb7
 
 Black can also exchange some pieces:
+
+<!-- FEN: r1bqr1k1/pp1n1ppp/2p1pn2/3p4/2PPP3/5NP1/PPQN1PBP/R4RK1 b - - 0 10 -->
 
 **10...dxe4 11.Nxe4 Nxe4 12.Qxe4 Bb7 13.Rfd1**
 
@@ -346,7 +390,11 @@ This is the most popular move. Notice that Black is keeping the knight on d7 to 
 
 ### 14.Ne5
 
+<!-- FEN: r2r2k1/pp1bqppp/2n1p3/8/1pPPn3/5NP1/PPQ2PBP/3R1RK1 w - - 0 14 -->
+
 This is the natural follow-up, but I found another attractive possibility: **14.c5!?N bxc5 15.Ng5! Nf6** (After **15...g6 16.dxc5 Nxc5 17.Qb4! Na6 18.Qh4 h5 19.Ne4 Rfd8 20.Rac1±** White has a dangerous initiative and the weak dark squares are starting to tell) **16.Qe5 Rfc8 17.Qxc7 Rxc7 18.dxc5 Nd5 19.Ne4 a5 20.Rd4±** White keeps the better chances in the arising endgame.
+
+<!-- FEN: 2r2rk1/pbpnqppp/1p2pn2/4P3/3P4/5NP1/PP1NQPBP/2RR2K1 b - - 0 14 -->
 
 ### 14...Nxe5 15.dxe5 Rfd8 16.b4 Rab8
 
@@ -396,7 +444,11 @@ A thematic idea to vacate the f1-square for the bishop.
 
 ### 13...a5
 
+<!-- FEN: r1bq1rk1/p2n1ppp/1pp1p3/3nP3/3PN3/5NP1/PP3PBP/R2QR1K1 b - - 1 13 -->
+
 **13...Ba6** was played in Tutisani – Savenkov, Maribor 2012, and now the natural **14.Qa4N Bd3 15.Re3 Bg6 16.Rc1±** would have given White a substantial plus.
+
+<!-- FEN: r2q1rk1/pb1n1ppp/1pp1p3/3nP3/3PN3/5NP1/PP3PBP/R2QR1K1 w - - 2 14 -->
 
 ### 14.Bf1 Rc8 15.Qb3 Nc7 16.Rac1 Na6
 
@@ -406,6 +458,8 @@ A thematic idea to vacate the f1-square for the bishop.
 ### 17.Nb1!
 
 The knight is heading for c3 - a great square to control the queenside.
+
+<!-- FEN: 2rq1rk1/1b1n1ppp/np2p3/p2pP3/3P4/1Q3NP1/PP3P1P/1NR1RBK1 b - - 7 17 -->
 
 ### 17...Qe7 18.Nc3 Rab8 19.Nb5
 
@@ -426,6 +480,8 @@ I believe that the surprising knight move constitutes White’s best chance for 
 
 ### C1) 6...c6 7.Qc2 Nbd7
 
+<!-- FEN: rnbq1rk1/ppp2ppp/3bpn2/3p2B1/2PP4/2N2NP1/PP2PP1P/R2QKB1R b KQ - 7 7 -->
+
 It is also worth mentioning **7...Bb4 8.Bg2 dxc4 9.e4 b5**, as in Rombaldoni – C. Horvath, Bratto 2008. Here **10.a4!N** would have been strong, for example **10...a5 11.axb5 Bxc3 12.bxc3 cxb5 13.0-0** and White has a great deal of compensation with Black’s dark-squared bishop missing.
 
 ---
@@ -445,6 +501,8 @@ Black has tried a couple of other moves:
 
 **10...c5 11.Bg2 0-0 12.Bc3 Qe7 13.0-0 cxd4 14.Nxd4 Nf6 15.Qc2±** White emerged from the opening with a lot of pressure in Ax. Smith – Pedersen, Skanderborg 2010.
 
+<!-- FEN: r1bqk2r/pp1n1ppp/2pbp3/8/2PPQ3/5NP1/PP1B1P1P/R3KB1R b KQkq - 0 10 -->
+
 **10...Nf6 11.Qc2 b6 12.Bg2 Bb7 13.c5! Bc7 14.0-0 Nd5 15.Rfe1 h6 16.Ne5 0-0 17.Rad1±** The thematic plan of c4-c5 against the bishop on b7 yielded a clear advantage in Llanes Hurtado – Meier, Belfort 2012.
 
 ### 11.Bd3 Nf6
@@ -463,11 +521,15 @@ Another game continued **12...Re8 13.0-0-0 b5 14.c5 Be7** Diermair – Matt, Lin
 **FEN:**  
 `r1bqr1k1/p3bppp/2p1pn2/1pP5/3P3Q/3B1NP1/PP1B1P1P/2KR3R w - - 1 15`
 
+<!-- FEN: r1b2rk1/pp3ppp/4pn2/2n3B1/1bP5/2NqQNP1/PP3PBP/R4RK1 w - - 3 15 -->
+
 Here White could have easily seized the initiative with **15.Ne5N Bb7 16.Qb1**, for instance **16...a5 17.Bg5 h6 18.Bxf6 Bxf6 19.Qe4±** with a strong attack.
 
 ### 13.Bg5 h5
 
 Black also fails to solve his problems with:
+
+<!-- FEN: r1bq1rk1/p4ppp/2pbpn2/1p6/2PP3Q/3B1NP1/PP1B1P1P/2KR3R b - - 1 13 -->
 
 **13...h6N 14.Bxf6** (after **14.Bxh6 gxh6 15.Qxh6 bxc4** White has a perpetual, but I don’t see anything more) **14...Qxf6 15.Qe4 Qf5**
 
@@ -521,9 +583,13 @@ Definitely the most challenging idea.
 **FEN:**  
 `r1bq1rk1/pp1n1ppp/2p1pn2/6B1/1bPP4/2N2NP1/PP3PBP/R2QK2R b KQ - 2 11`
 
+<!-- FEN: r1bq1rk1/pp1n1ppp/2p1pn2/6B1/1bPPN3/5NP1/PP3PBP/R2QK2R w KQ - 1 11 -->
+
 **11.Bd2 Bxd2+ 12.Nexd2** is well met by **12...e5! 13.dxe5 Re8 14.0-0 Nxe5 15.Nxe5 Rxe5** when Black was perfectly okay in Ghaem Maghami – Moiseenko, Jakarta 2013.
 
 ### 11...Qa5
+
+<!-- FEN: r1bq1rk1/pp1n1ppp/2p1pn2/6B1/1bPP4/2N2NP1/PP3PBP/R2QK2R b KQ - 2 11 -->
 
 Black has also tried **11...c5**, without much success. **12.0-0 cxd4 13.Qxd4 Nc5** (**13...h6 14.Bf4 Nb6 15.Nb5+** does not help Black) **14.Qe3 Qd3**
 
@@ -544,6 +610,8 @@ This was Kunin – Klek, Wunsiedel 2013, and now White could have secured a big 
 
 **12.0-0!?** also deserves attention, since **12...Bxc3 13.bxc3 Qxc3 14.Qe2∞** leaves White with great compensation.
 
+<!-- FEN: r1bq1rk1/pp1n1ppp/4pn2/2p3B1/1bPP4/2N2NP1/PP3PBP/R2Q1RK1 b - - 1 12 -->
+
 ### 12...e5 13.a3 Bxc3 14.Bxc3 Qa6
 
 Black’s position was rather suspicious in Meier – Adams, Baden-Baden 2013. White’s strongest continuation would have been:
@@ -561,8 +629,12 @@ With a serious advantage.
 
 ### Conclusion
 
+<!-- FEN: rnbqk2r/ppp2ppp/4pn2/3p4/1bPP4/5NP1/PP1BPP1P/RN1QKB1R b KQkq - 3 5 -->
+
 **5...c5** is not really a serious equalizing attempt, and White gets a good game after exchanging on b4, followed by developing normally and preparing e2-e4.
 
 **5...Bxd2+ 6.Nbxd2 0-0 7.Bg2** is also rather pleasant for White. Black’s position is reasonably solid, but we saw that White could maintain pressure in all three of the lines examined.
+
+<!-- FEN: rnbqk2r/ppp2ppp/4pn2/3p4/1bPP4/5NP1/PP1BPP1P/RN1QKB1R b KQkq - 3 5 -->
 
 **5...Bd6** is the trickiest of the three main lines examined, since the stereotypical development of the bishop on g2 does not give White anything special. Fortunately for us, **6.Nc3!** has a lot more bite. Depending on how Black continues, White will play either **Qc2** or **Bg5** next, intending to force through a quick e2-e4.
