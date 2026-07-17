@@ -140,6 +140,7 @@ h1, h2, h3, h4, h5 { font-family: Manrope, Inter, sans-serif; }
 .narrative h3 { margin: 30px 0 12px; color: var(--ink); font-size: 17px; }
 .narrative h4, .narrative h5 { margin: 24px 0 10px; color: var(--ink); font-size: 15px; }
 .narrative p { margin: 0 0 22px; white-space: pre-line; }
+.narrative p.variation-index-p { white-space: pre-wrap; font-size: 15px; margin: 16px 0 22px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 253, 248, .5); line-height: 1.65; }
 .narrative ul { margin: 0 0 22px; padding-left: 22px; }
 .narrative hr { margin: 34px 0; border: 0; border-top: 1px solid var(--line); }
 .narrative code { font-size: .86em; }
@@ -212,4 +213,65 @@ h1, h2, h3, h4, h5 { font-family: Manrope, Inter, sans-serif; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; }
   .page-loader-mark, .page-loader-mark span { animation: none; }
+}
+
+.variation-index-tree {
+  margin: 20px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255, 253, 248, .72);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.vi-shared-line {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.vi-branch {
+  margin: 4px 0;
+}
+.vi-label {
+  display: inline;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--ink);
+  background: rgba(36, 101, 84, .08);
+  font-weight: 750;
+  font-size: 12px;
+}
+.vi-tokens {
+  display: inline;
+}
+.vi-token {
+  display: inline;
+  margin: 0 1px;
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+}
+.vi-token-move {
+  color: var(--forest-2);
+  background: rgba(36, 101, 84, .09);
+  font-weight: 750;
+  text-decoration: none;
+}
+.vi-token-move:hover, .vi-token-move.vi-active {
+  color: white;
+  background: var(--forest-2);
+}
+.vi-token-unresolved {
+  color: var(--muted);
+}
+.vi-error {
+  padding: 12px;
+  border: 1px solid #dbb4af;
+  border-radius: 8px;
+  color: #8b3029;
+  background: #f6e6e4;
+  white-space: pre-wrap;
+  font-size: 13px;
 }

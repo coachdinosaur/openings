@@ -10,7 +10,23 @@
 
 ### Chapter 3 · 5...c6 variation index
 
-Variation Index: 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 c6 6.Ne5. A) 6...b5 7.Nxc6 Qb6 8.Na5!; A1) 8...Qxa5+N; A2) 8...Nd5 9.Bd2; A21) 9...a6; A22) 9...Nc6 10.Nxc6 Qxc6 11.e4; A221) 11...Nb4; A222) 11...Nf6. B) 6...Bb4+ 7.Bd2!; B1) 7...Be7 8.e3; B11) 8...O-O; B12) 8...b5; B2) 7...Qxd4 8.Bxb4 Qxe5 9.Na3 b5 10.Bd6! Qxb2 11.O-O Nd5 12.e4 Nc3 13.Qh5!; B21) 13...Nd7; B22) 13...h6!?
+1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 c6 6.Ne5
+
+A) 6...b5 7.Nxc6 Qb6 8.Na5!
+    A1) 8...Qxa5+N
+    A2) 8...Nd5 9.Bd2
+        A21) 9...a6
+        A22) 9...Nc6 10.Nxc6 Qxc6 11.e4
+            A221) 11...Nb4
+            A222) 11...Nf6
+
+B) 6...Bb4+ 7.Bd2!
+    B1) 7...Be7 8.e3
+        B11) 8...O-O
+        B12) 8...b5
+    B2) 7...Qxd4 8.Bxb4 Qxe5 9.Na3 b5 10.Bd6! Qxb2 11.O-O Nd5 12.e4 Nc3 13.Qh5!
+        B21) 13...Nd7
+        B22) 13...h6!?
 
 **Opening position after 5...c6**
 

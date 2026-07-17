@@ -8,7 +8,15 @@
 
 <!-- FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -->
 
-Variation Index: 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 Bd7 6.Ne5 Bc6 7.Nxc6 Nxc6 8.O-O. A) 8...Be7, B) 8...Nd5!?, C) 8...Qd7 9.e3, C1) 9...Rb8 and C2) 9...O-O-O.
+1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 Bd7 6.Ne5 Bc6 7.Nxc6 Nxc6 8.O-O
+
+A) 8...Be7
+
+B) 8...Nd5!?
+
+C) 8...Qd7 9.e3
+    C1) 9...Rb8
+    C2) 9...O-O-O
 
 **Opening position after 5...Bd7**
 

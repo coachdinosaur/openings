@@ -10,7 +10,21 @@
 
 ### Chapter 4 · 5...Bb4+ variation index
 
-Variation Index: 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 Bb4+ 6.Bd2. A) 6...Bxd2+; B) 6...c5; C) 6...Be7; D) 6...a5 7.Qc2; D1) 7...Nc6; D2) 7...Bxd2+ 8.Qxd2 c6 9.a4; D21) 9...Ne4; D22) 9...b5. The three index improvements are 14.Bxb4!N, 14.Rfd1!N and 23.d5!N.
+1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 Bb4+ 6.Bd2
+
+A) 6...Bxd2+
+
+B) 6...c5
+
+C) 6...Be7
+
+D) 6...a5 7.Qc2
+    D1) 7...Nc6
+    D2) 7...Bxd2+ 8.Qxd2 c6 9.a4
+        D21) 9...Ne4
+        D22) 9...b5
+
+The three index improvements are 14.Bxb4!N, 14.Rfd1!N and 23.d5!N.
 
 **Opening position after 5...Bb4+**
 

@@ -13,15 +13,12 @@
 
 ### Variation Index
 
-1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 b5  
-6.a4 c6 7.axb5 cxb5 8.Ne5 Nd5 9.0-0! Bb7 10.b3! cxb3 11.Qxb3 a6 12.e4
+1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 b5 6.a4 c6 7.axb5 cxb5 8.Ne5 Nd5 9.0-0! Bb7 10.b3! cxb3 11.Qxb3 a6 12.e4
 
-A) 12...Nf6 13.d5 — 129
-
-- A1) 13...Bd6 — 129
-- A2) 13...exd5 — 130
-
-B) 12...Nb4N — 131
+A) 12...Nf6 13.d5
+    A1) 13...Bd6
+    A2) 13...exd5
+B) 12...Nb4N
 
 ---
 

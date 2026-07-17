@@ -6,7 +6,23 @@
 
 ### Chapter 1 - Catalan · Introduction
 
-Variation Index: 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3. A) 4...g6 5.Bg2 Bg7 6.O-O O-O 7.Qc2, with A1) 7...Nc6, A2) 7...Na6 and A3) 7...Nbd7. B) 4...c6 5.Bg2 Nbd7 6.O-O Bd6 7.Nfd2 O-O 8.Nc3, with B1) 8...Re8 and B2) 8...Bb4. C) 4...c5 5.Bg2, with C1) 5...Be7 and C2) 5...Nc6 6.O-O.
+This chapter analyses A) 4...g6, B) 4...c6 and C) 4...c5.
+
+A) 4...g6 5.Bg2 Bg7 6.O-O O-O 7.Qc2
+    A1) 7...Nc6
+    A2) 7...Na6
+    A3) 7...Nbd7
+
+B) 4...c6 5.Bg2 Nbd7 6.O-O Bd6 7.Nfd2 O-O 8.Nc3
+    B1) 8...Re8
+    B2) 8...Bb4
+
+C) 4...c5 5.Bg2
+    C1) 5...Be7
+<!-- FEN: rnbqkb1r/pp3ppp/4pn2/2pp4/2PP4/5NP1/PP2PPBP/RNBQK2R b KQkq - 1 5 -->
+    C2) 5...Nc6 6.O-O
+        C21) 6...Be7
+        C22) 6...cxd4
 
 **Opening position after 4.Nf3**
 

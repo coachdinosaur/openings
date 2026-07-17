@@ -10,9 +10,17 @@
 
 ### Chapter 8 - 5...a6 and 6...b5 index
 
-Black's 5...a6 and 6...b5 tries to keep the extra c4-pawn with queenside expansion. White replies with Ne5, a4 and e4, using the lead in development to open the centre. The chapter divides after 13.d5, when Black must choose among ...cxd5, ...Bd6, ...exd5 and ...Be7.
+Black's 5...a6 and 6...b5 tries to keep the extra c4-pawn with queenside expansion. White replies with Ne5, a4 and e4, using the lead in development to open the centre.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5
+
+B1) 13...cxd5
+B2) 13...Bd6
+B3) 13...exd5
+B4) 13...Be7
+A) 7...c6 8.b3
+
+The chapter divides after 13.d5, when Black must choose among ...cxd5, ...Bd6, ...exd5 and ...Be7.
 
 **Chapter starting position after 6...b5**
 

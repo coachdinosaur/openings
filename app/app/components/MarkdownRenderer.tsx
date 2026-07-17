@@ -7,10 +7,9 @@ import { createContext, memo, ReactNode, useContext, useMemo } from "react";
 import { Chess, type Square } from "chess.js";
 import { MarkdownMoveResolver, type MarkdownMoveToken, type MoveNavigation } from "../lib/markdown-moves";
 import { extractFenBlocks } from "../lib/markdown-chapter";
-
 type MoveHandler = (navigation: MoveNavigation) => void;
 
-const ActiveNavigationContext = createContext<MoveNavigation | null>(null);
+export const ActiveNavigationContext = createContext<MoveNavigation | null>(null);
 
 function isActiveNavigationStep(candidate: MoveNavigation, active: MoveNavigation | null): boolean {
   if (!active || candidate.index !== active.index) return false;
@@ -207,7 +206,8 @@ function parseMarkdown(markdown: string, onMove: MoveHandler): ReactNode[] {
       index++;
     }
     const text = paragraph.join("\n");
-    nodes.push(<p key={`paragraph-${index}`}>{renderInline(text, resolver, onMove, `paragraph-${index}`)}</p>);
+    const isVi = paragraph.some((l) => /^[A-Z]\d*\)/.test(l.trim()));
+    nodes.push(<p key={`paragraph-${index}`} className={isVi ? "variation-index-p" : undefined}>{renderInline(text, resolver, onMove, `paragraph-${index}`)}</p>);
   }
   return nodes;
 }

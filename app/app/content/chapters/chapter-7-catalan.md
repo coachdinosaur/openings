@@ -10,9 +10,14 @@
 
 ### Chapter 7 - 7...Bd7 variation index
 
-After 5...c5 6.O-O Nc6 7.Qa4, the developing 7...Bd7 is Black's main reply. White recovers the c4-pawn and meets four plans: A) ...Rc8, B) ...Qb6, C) ...b5 and D) ...cxd4. In every branch, development and pressure against the queenside are more important than material alone.
+After 5...c5 6.O-O Nc6 7.Qa4, the developing 7...Bd7 is Black's main reply. White recovers the c4-pawn and meets four plans.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 c5 6.O-O Nc6 7.Qa4 Bd7
+
+A) 8...Rc8
+B) 8...Qb6
+C) 8...b5
+D) 8...cxd4
 
 **Chapter starting position after 7...Bd7**
 

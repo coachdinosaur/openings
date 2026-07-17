@@ -10,9 +10,14 @@
 
 ### 5...c5 — Variation Index
 
-After 5...c5, White castles and lets Black decide how to address the lead in development. The chapter first examines A) 6...cxd4, including the queen moves 7...Qb6, 7...Bc5 and 7...a6!?, before turning to B) 6...Nc6 and the forcing central liquidation after 7.Qa4.
+After 5...c5, White castles and lets Black decide how to address the lead in development.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 c5
+
+A) 6...cxd4
+B) 6...Nc6 7.Qa4
+
+The chapter first examines A) 6...cxd4, including the queen moves 7...Qb6, 7...Bc5 and 7...a6!?, before turning to B) 6...Nc6 and the forcing central liquidation after 7.Qa4.
 
 **Index position after 5...c5**
 

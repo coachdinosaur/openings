@@ -10,7 +10,16 @@
 
 ### Chapter 5 · 5...Nbd7 variation index
 
-The chapter covers A) 6...c5, B) 6...c6, C) 6...a6, D) 6...Rb8, E) 6...Be7 and the main continuation F) 6...Nb6. The index highlights the new ideas 10.Be3!N, 15.e4!N and 12.Nd2!?N, then divides F into F1) 10...Qb6, F2) 10...Rc8 and F3) 10...b5.
+1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 Nbd7 6.O-O
+
+A) 6...c5
+B) 6...c6
+C) 6...a6
+D) 6...Rb8
+E) 6...Be7
+F) 6...Nb6
+
+The index highlights the new ideas 10.Be3!N, 15.e4!N and 12.Nd2!?N, then divides F into F1) 10...Qb6, F2) 10...Rc8 and F3) 10...b5.
 
 **Opening position after 5...Nbd7**
 
