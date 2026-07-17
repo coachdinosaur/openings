@@ -10,6 +10,8 @@
 
 ### Chapter 8 - 5...a6 and 6...b5 index
 
+Black's 5...a6 and 6...b5 tries to keep the extra c4-pawn with queenside expansion. White replies with Ne5, a4 and e4, using the lead in development to open the centre. The chapter divides after 13.d5, when Black must choose among ...cxd5, ...Bd6, ...exd5 and ...Be7.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5
 
 **Chapter starting position after 6...b5**
@@ -47,6 +49,8 @@
 <!-- FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -->
 
 ### The direct pawn hold
+
+The immediate 7.Ne5 asks Black how the queenside can be maintained while the kingside remains undeveloped. The artificial 7...Ra7?! protects b7 but misplaces the rook, so White can proceed with development. The more logical 7...c6 is met by 8.b3, undermining c4 before Black is ready.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Ra7?!
 
@@ -91,6 +95,8 @@
 
 ### A) central pressure after 12.e4
 
+After 8.b3, exchanges on b3 allow the knight to enter c6 and a5. White regains material while Black's queenside pieces lose coordination. The central move 12.e4 prepares e5 and gives the rooks useful files; Black cannot finish development without facing another forcing break.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 c6 8.b3 cxb3 9.Nxc6 Qb6 10.Na5! Ra7 11.Nxb3 Rd7 12.e4 Bb7 13.Re1 Be7
 
 **A) Position before 14.e5!**
@@ -134,6 +140,8 @@
 
 ### B) 8.a4 and 9.e4
 
+The main reply 7...Nd5 blocks the long diagonal and supports b5, so White attacks the chain with 8.a4 and follows with 9.e4. After the rook exchange on a8, 12.Nc3 completes development. Black's 12...b4?! overextends; the critical 12...c6 prepares to meet 13.d5 in four different ways.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 b4?!
 
 **B) Position after 12...b4?!**
@@ -170,6 +178,8 @@
 
 ### B1) 13...cxd5 and 15.Bxd5!
 
+After 13...cxd5 14.exd5, Black's bishop appears to win a pawn, but 15.Bxd5! is a thematic temporary sacrifice. White uses Ng4, Nxf6+ and Re1+ to exploit the uncastled king. Material recovery is secondary to opening lines while Black's pieces remain undeveloped.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 cxd5 14.exd5 Bxd5
 
 **B1) Position before 15.Bxd5!**
@@ -194,6 +204,8 @@
 <!-- FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -->
 
 ### B1) the final attacking motif
+
+Black can vary with ...Ne4 or ...Be7, but the same principle holds: White's knights enter with tempo and the exposed king prevents consolidation. In the sharp ...f5 line, checks and captures on d5 open decisive files. The next defence, 13...Bd6, develops a piece but blocks Black's queen.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 cxd5 14.exd5 Bxd5 15.Bxd5 exd5 16.Ng4 Ne4 17.Nxd5 f5
 
@@ -243,6 +255,8 @@
 
 ### B2) tactical refutations
 
+Against 13...Bd6, 14.Bf4 develops with a direct challenge to the bishop. Black's queen moves can run into Nxb5, and exchanges on e5 or d5 leave the queenside pawns exposed. White welcomes simplification because the remaining bishop is active and Black still lacks safe coordination.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Bd6 14.Bf4 Qc7
 
 **B2) Position before 15.Nxf7!**
@@ -276,6 +290,8 @@
 <!-- FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -->
 
 ### B2/B3 transition with 18.Bc7!
+
+When Black releases the centre, 18.Bc7! develops with tempo against the queen and prevents easy castling. This tactical detail completes the case against 13...Bd6. The related 13...exd5 line leaves the b5-pawn loose, so White uses 15.Nxb5 to combine material recovery with continued initiative.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Bd6 14.Bf4 Bxe5 15.Bxe5 exd5 16.exd5 cxd5 17.Qa1 Nc6 18.Bc7!
 
@@ -320,6 +336,8 @@
 
 ### B3) 18.Qb7!?N
 
+After 13...exd5 14.exd5 cxd5, 15.Nxb5 removes the support of c4 and exposes the back rank. The novelty 18.Qb7!?N keeps queens on the board and forces Black to solve concrete threats. Even if queens are exchanged, White's bishops and healthier structure produce the easier ending.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 exd5 14.exd5 cxd5 15.Nxb5 Bc5 16.Qa4 O-O 17.Qxa8 Qe8 18.Qb7!?N Qxe5 19.Bf4 Qe7 20.Bxd5 Qxb7 21.Bxb7
 
 **B3) Position after 17...Qe8!**
@@ -363,6 +381,8 @@
 
 ### B4) energetic reaction to ...Na6
 
+The developing 13...Be7 is Black's most resilient answer, but 14.dxe6 opens lines and 15.Qe2 supports both e6 and the kingside. If Black uses ...Na6 to cover the queenside, 16.Bh3 creates immediate threats. Black must choose between 16...Kh8 and the defensive 16...Qc8.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Be7 14.dxe6 fxe6 15.Qe2 O-O 16.Bh3
 
 **B4) Position after 16.Bh3**
@@ -398,6 +418,8 @@
 <!-- FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -->
 
 ### B41) improving on the old Bf4 line
+
+After 16...Kh8, White wins e6 but must keep the initiative as Black reorganizes. The old Bf4 plan allows counterplay with ...c5, so the improved setup develops more patiently. Be3, f4 and Ra1 coordinate the pieces, and 23.Nf3! prepares e5 while restricting the queenside knight.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Be7 14.dxe6 fxe6 15.Qe2 O-O 16.Bh3 Kh8 17.Bxe6 Qe8 18.Rd1 Bb7 19.Bf4 Na6 20.Nd7 Nxd7 21.Bxd7 Qf7 22.e5 Qg6N 23.Be3 Nb4 24.Ra1 c5!
 
@@ -442,6 +464,8 @@
 
 ### B42) 16...Qc8 and 17.Nf3
 
+Black's 16...Qc8 directly protects e6, so White should not force matters. The calm 17.Nf3 brings another piece toward e5 and g5. If Black chooses ...Ne8, the resource 18.Bg5N improves the worst-placed piece and makes the pin on e7 strategically awkward.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Be7 14.dxe6 fxe6 15.Qe2 O-O 16.Bh3 Qc8 17.Nf3
 
 **B42) Position after 17.Nf3**
@@ -483,6 +507,8 @@
 
 ### B42) testing GM1 recommendations
 
+The older recommendation 18.Ng5 remains dangerous, but Black's defensive regrouping with ...Nc7 and ...Nfe8 deserves accuracy. White improves the plan with 21.Qe3N, reinforcing the centre before sending the knights forward. The point is to increase pressure without allowing simplifying exchanges.
+
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Be7 14.dxe6 fxe6 15.Qe2 O-O 16.Bh3 Qc8 17.Nf3 Na6 18.Ng5 Nc7 19.Bf4 Nfe8 20.Rd1 Bb7
 
 **B42) Position before 21.Nf3**
@@ -523,6 +549,8 @@
 <!-- FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -->
 
 ### B42) trading the dark-squared bishops
+
+With queen, knights and bishop aimed at the king, 25.Qe2! keeps every threat alive. The manoeuvre 26.Bd6! trades Black's dark-squared bishop, the key defender, and leaves White's rook active on the sixth rank. The chapter's conclusion is consistent: Black may hold the extra pawn briefly, but cannot safely complete development.
 
 1.d4 Nf6 2.c4 e6 3.g3 d5 4.Nf3 dxc4 5.Bg2 a6 6.O-O b5 7.Ne5 Nd5 8.a4 Bb7 9.e4 Nf6 10.axb5 axb5 11.Rxa8 Bxa8 12.Nc3 c6 13.d5 Be7 14.dxe6 fxe6 15.Qe2 O-O 16.Bh3 Qc8 17.Nf3 Na6 18.Ng5 Nc7 19.Bf4 Nfe8 20.Rd1 Bb7 21.Qe3 h6 22.Nf3 Na6 23.Ne5 Nec7 24.Ng6 Bc5 25.Qe2! Rd8 26.Bd6! Bxd6 27.Rxd6
 

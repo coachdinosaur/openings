@@ -16,6 +16,7 @@ function fail(message) {
 export function parseChapterMarkdown(filename, markdown) {
   const fileMatch = CHAPTER_FILE.exec(filename);
   if (!fileMatch) fail(`Invalid chapter filename ${filename}; expected chapter-N-catalan.md.`);
+  if (/\u00a0|&nbsp;|&#0*160;|&#x0*a0;/i.test(markdown)) fail(`${filename} contains a non-breaking space; use a regular space instead.`);
   const id = Number(fileMatch[1]);
   const titles = [...markdown.matchAll(/^# (.+)$/gm)].map((match) => match[1].trim());
   if (titles.length !== 1) fail(`${filename} must contain exactly one level-one title.`);
