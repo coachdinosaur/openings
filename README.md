@@ -40,10 +40,13 @@ Then run:
 ```powershell
 cd app
 npm run chapters:status
+npm run chapters:audit -- --chapter N --markdown app/content/chapters/chapter-N-catalan.md --expected-pages P --expected-diagrams D --strict-moves
 npm run chapters:sync
 npm run chapters:check
 npm test
 npm run lint
 ```
 
-The catalog and shared route expose new contiguous chapters automatically. Do not add chapter-specific routes, manifests, lesson TypeScript, packages, review/import screens, or PDF conversion code.
+Before the audit, compare every Markdown page and visible FEN diagram with the immutable root PDF. The audit is read-only and reports structural errors plus unresolved analysis and reference tokens. Resolve every genuine analysis sequence; human-review isolated prose and cross-chapter references.
+
+Publish one contiguous chapter at a time. The catalog and shared route expose it automatically. Do not add chapter-specific routes, manifests, lesson TypeScript, packages, review/import screens, or runtime PDF conversion code.

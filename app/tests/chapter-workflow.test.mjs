@@ -5,11 +5,11 @@ import { catalogSource, discoverChapters, parseChapterMarkdown } from "../script
 
 test("discovers one contiguous Markdown catalog", async () => {
   const chapters = await discoverChapters();
-  assert.deepEqual(chapters.map((chapter) => chapter.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(chapters.map((chapter) => chapter.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   assert.ok(chapters.every((chapter) => chapter.pageCount > 0));
   assert.ok(chapters.every((chapter) => chapter.visibleFenCount > 0));
   const catalog = catalogSource(chapters);
-  assert.match(catalog, /CHAPTER_IDS = \["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"\]/);
+  assert.match(catalog, /CHAPTER_IDS = \["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"\]/);
   assert.doesNotMatch(catalog, /chapter-packages|manifest|pdfjs|sourcePdf/);
 });
 
@@ -33,8 +33,9 @@ test("Chapters 6-8 retain explanatory lesson prose on every page", async () => {
   }
 });
 
-test("package scripts expose only the Markdown chapter workflow", async () => {
+test("package scripts expose the Markdown chapter workflow and read-only audit", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-  assert.deepEqual(Object.keys(packageJson.scripts).filter((name) => name.startsWith("chapters:")), ["chapters:status", "chapters:sync", "chapters:check"]);
+  assert.deepEqual(Object.keys(packageJson.scripts).filter((name) => name.startsWith("chapters:")), ["chapters:status", "chapters:sync", "chapters:check", "chapters:audit"]);
+  assert.match(packageJson.scripts["chapters:audit"], /chapter-audit\.ts/);
   assert.equal(packageJson.dependencies["pdfjs-dist"], undefined);
 });

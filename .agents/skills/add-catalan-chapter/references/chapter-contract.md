@@ -2,40 +2,42 @@
 
 ## Required artifacts
 
-- Root input: `ChapterN_Catalan.pdf` (immutable source evidence). A combined source PDF is first split into these staged inputs by `chapters:bundle`, with a versioned source-bundle manifest that records the source hash, complete page ranges, and every derived hash.
-- Lesson: `app/app/chapterN-lesson.ts`, exporting the complete `LessonDocument`, annotated move IDs, and section list.
-- Manifest: `app/app/chapter-manifests/chapter-N.json`, declaring versioned source, canonical, review, verification, and evidence facts.
-- Package: `app/app/chapter-packages/chapter-N.ts`, exporting `CHAPTER_CONFIG`.
-- Evidence: `app/public/source/chapterN/pages/printed-PP.png` and `app/public/source/chapterN/crops/CHN-DXX.png` (or equally stable IDs declared by the lesson).
-- Catalog: `app/app/chapter-catalog.generated.ts`, produced only by `npm run chapters:sync`.
+- Immutable root references: `ChapterN_Catalan.md` and `ChapterN_Catalan.pdf`.
+- Published lesson: `app/app/content/chapters/chapter-N-catalan.md`.
+- Generated catalog: `app/app/chapter-catalog.generated.ts`, produced only by `npm run chapters:sync`.
+- Temporary PDF renders and contact sheets under ignored `tmp/pdfs/` for visual auditing only.
 
-## Package fields
+PDFs are reference evidence, not application inputs or build dependencies. The shared `/chapters/[chapterId]` route, catalog, renderer, board, and navigation must publish the chapter automatically from its Markdown.
 
-The manifest sets the numeric identity, printed boundaries, source filename/hash/page count, legal default position, unique chapter-specific review key, canonical lesson hash, evidence counts, and verification regions. Starting with Chapter 6, `lesson.publicationProfile` must be `"authored"`. The package supplies the complete lesson, annotated move IDs, and section anchors through `defineChapterPackage`. The source filename must be `ChapterN_Catalan.pdf`, and every imported source region needs at least one stable text anchor.
+## Markdown shape
 
-## Source fidelity
+- Exactly one level-one chapter title.
+- One contiguous `## Page N` boundary for every PDF page, starting at 1.
+- Source headings represented by `###` through `#####` according to their visible hierarchy.
+- Source-faithful prose, punctuation, evaluations, novelty marks, paragraph breaks, and move notation.
+- One visible `**FEN:**` block for every PDF diagram and no extra visible diagrams.
+- Optional hidden `<!-- FEN: ... -->` anchors only for legal variation roots that are not visible PDF diagrams.
+- No non-breaking spaces, conversion notes, placeholder content, or chapter-specific application code.
 
-- Account for every PDF page and every source diagram.
-- Keep source spans contiguous and ordered from 1.
-- Preserve the reading stream: full-page index/intro, then left column and right column per body page unless visual inspection proves a different layout.
-- Preserve exact prose meaning, chess notation, punctuation, novelty marks, and evaluations. Store legal canonical SAN separately from the printed token.
-- Link each readable move token to an existing line and move index. Mark genuinely unreadable material unresolved; do not invent it.
-- Derive diagram FENs from legal move paths. Visually compare each rendered board with its crop.
+## Source and navigation fidelity
+
+- Account for every PDF page and diagram and preserve the PDF reading stream.
+- Compare every rendered FEN board with its source diagram; derive any new anchor from legal moves with `chess.js`.
+- Preserve printed SAN and annotations while resolving their canonical legal moves internally.
+- Make every legally reconstructable analysis sequence navigable. Isolated prose squares and cross-chapter references are human-reviewed separately.
+- Keep sibling variations isolated, child variations rooted in their parent line, and conclusion recaps navigable from the correct position.
 
 ## Completion gates
 
 A chapter is publishable only when all are true:
 
-1. The root PDF hash equals the lesson/package source hash.
-2. Source spans, blocks, lines, moves, diagrams, sections, and import regions pass the shared structural validator.
-3. Every move path is legal and every diagram link/FEN is valid.
-   Beginning with Chapter 3, the shared validator must also reject any block that contains numbered chess notation but has no move links. Chapters 1 and 2 predate this publication gate.
-   Beginning with Chapter 6, every source region must have an authored variation block, and every diagram must derive from an authored legal line. Generated source summaries and independently recognized source positions are rejected.
-4. The complete lesson canonical hash is frozen in the package.
-5. `chapters:verify`, `chapters:sync`, `chapters:check`, typecheck, build, tests, and lint pass.
-6. Learner, review, and import routes render correctly, navigation includes the chapter automatically, and the exact PDF produces a zero-change import.
-7. Desktop and narrow-width visual checks show no clipping, overlap, broken boards, missing assets, or out-of-order content.
+1. The immutable root Markdown and PDF remain unchanged during conversion.
+2. The strict chapter audit passes with the visually confirmed page and diagram totals.
+3. Page hierarchy, paragraph spacing, prose, moves, and diagrams match the PDF page by page.
+4. Every FEN is valid and every genuine analysis-sequence move is legally navigable.
+5. Exact diagram-count and critical branch regression tests pass.
+6. `chapters:sync`, `chapters:check`, typecheck, build, tests, and lint pass.
+7. `/chapters/N` renders through the shared route, navigation includes it automatically, and invalid/later chapter IDs still return 404.
+8. Desktop and narrow-width checks show no clipping, overlap, broken boards, missing assets, out-of-order content, or unusable controls.
 
-Use `chapters:validate-lesson` before publishing and retain the exact diagram count in the crop extraction command. These two gates catch the most common PDF transcription failures: chess-font glyph confusion, SAN disambiguation, diagrams that show the position before the captioned move, and an omitted or duplicated board crop.
-
-Chapter 1 retains a legacy structural-validation profile, but its full packaged lesson now has a frozen canonical hash in its manifest.
+Publish one complete chapter at a time and stop at the requested approval checkpoint before starting the next staged chapter.

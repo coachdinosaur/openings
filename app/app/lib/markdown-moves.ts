@@ -41,8 +41,9 @@ export class MarkdownMoveResolver {
   private knownMoveIndex: Map<string, RootMoveCandidate[]>;
   private moveCache: Map<string, ReturnType<typeof resolveChessMove>>;
   private navigations: MoveNavigation[];
+  private trackNavigationExtensions: boolean;
 
-  constructor(fen = START_FEN, label = "Initial position") {
+  constructor(fen = START_FEN, label = "Initial position", trackNavigationExtensions = true) {
     const root = { fen, steps: [{ fen, label }] };
     this.active = root;
     this.history = [];
@@ -51,6 +52,7 @@ export class MarkdownMoveResolver {
     this.knownMoveIndex = new Map();
     this.moveCache = new Map();
     this.navigations = [];
+    this.trackNavigationExtensions = trackNavigationExtensions;
     this.indexRoot(root);
     this.resetHistory(root);
   }
@@ -119,6 +121,7 @@ export class MarkdownMoveResolver {
   }
 
   private createNavigation(path: PositionPath): MoveNavigation {
+    if (!this.trackNavigationExtensions) return { steps: path.steps, index: path.steps.length - 1 };
     for (const navigation of this.navigations) {
       if (pathExtends(path.steps, navigation.steps)) navigation.steps = path.steps;
     }
@@ -133,10 +136,14 @@ export class MarkdownMoveResolver {
 
   resolveText(text: string): MarkdownMoveToken[] {
     const tokens: MarkdownMoveToken[] = [];
+    const isolatedEmphasisRanges = [...text.matchAll(/\*\*(.+?)\*\*/g)]
+      .filter((match) => [...match[1].matchAll(SOURCE_MOVE_TOKEN)].length === 1)
+      .map((match) => ({ start: (match.index ?? 0) + 2, end: (match.index ?? 0) + 2 + match[1].length }));
     let active = this.active;
     let lastBefore = active;
     let depth = 0;
     const returnStates: PositionPath[] = [];
+    const branchStarts: PositionPath[] = [];
 
     for (const match of text.matchAll(SOURCE_MOVE_TOKEN)) {
       const at = match.index ?? 0;
@@ -144,10 +151,12 @@ export class MarkdownMoveResolver {
       while (nextDepth > depth) {
         returnStates.push(active);
         active = lastBefore;
+        branchStarts.push(active);
         depth++;
       }
       while (nextDepth < depth) {
         active = returnStates.pop() ?? active;
+        branchStarts.pop();
         depth--;
       }
 
@@ -155,11 +164,13 @@ export class MarkdownMoveResolver {
       if (!display || isLikelyProseSquare(text, at, display)) continue;
 
       const numberedKey = moveNumberKey(display);
-      // A parenthetical variation has one explicit branch point. Searching old
-      // history from inside it can attach a later move to the main line when
-      // the variation's first move is invalid or anchored incorrectly.
+      const isolatedUnnumberedMention = !numberedKey && isolatedEmphasisRanges.some((range) => at >= range.start && at < range.end);
+      // A parenthetical variation has one explicit branch point. Reuse that
+      // local root for sibling alternatives instead of arbitrary old history;
+      // explicit FEN roots remain available for deliberately anchored branches.
       const indexedHistory = numberedKey && depth === 0 ? [...(this.historyByMove.get(numberedKey) ?? [])].reverse() : [];
-      const candidates = uniqueCandidates([active, ...indexedHistory]);
+      const parentheticalRoot = numberedKey && depth > 0 ? branchStarts[depth - 1] : undefined;
+      const candidates = uniqueCandidates([active, ...(parentheticalRoot ? [parentheticalRoot] : []), ...indexedHistory]);
       let resolved: PositionPath | null = null;
       let before: PositionPath | null = null;
       const legalCandidates: Array<{ before: PositionPath; resolved: PositionPath }> = [];
@@ -172,7 +183,7 @@ export class MarkdownMoveResolver {
           steps: [...candidate.steps, { fen: move.fen, label: display }],
         } });
       }
-      if (numberedKey && depth === 0) {
+      if (numberedKey) {
         const rootCandidates = this.knownMoveIndex.get(`${numberedKey}\u0000${normalizeSan(display)}`) ?? [];
         for (const candidate of rootCandidates) {
           legalCandidates.push({
@@ -194,9 +205,11 @@ export class MarkdownMoveResolver {
       }
 
       if (resolved && before) {
-        lastBefore = before;
-        active = resolved;
-        this.remember(resolved);
+        if (!isolatedUnnumberedMention) {
+          lastBefore = before;
+          active = resolved;
+          this.remember(resolved);
+        }
         tokens.push({ display, index: at, navigation: this.createNavigation(resolved) });
       } else {
         tokens.push({ display, index: at, navigation: null });
@@ -205,6 +218,7 @@ export class MarkdownMoveResolver {
 
     while (depth > 0) {
       active = returnStates.pop() ?? active;
+      branchStarts.pop();
       depth--;
     }
     this.active = active;

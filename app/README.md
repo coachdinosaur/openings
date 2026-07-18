@@ -15,11 +15,12 @@ npm run dev
 
 ```powershell
 npm run chapters:status
+npm run chapters:audit -- --chapter N --markdown app/content/chapters/chapter-N-catalan.md --expected-pages P --expected-diagrams D --strict-moves
 npm run chapters:sync
 npm run chapters:check
 ```
 
-Add a chapter by creating `app/content/chapters/chapter-N-catalan.md`; never add a chapter-specific route or navigation entry.
+Add one contiguous chapter by creating `app/content/chapters/chapter-N-catalan.md`. Visually confirm its PDF page and diagram totals, make every genuine analysis sequence navigable, and pass the read-only audit before catalog sync. Never add a chapter-specific route or navigation entry.
 
 ## Verification
 

@@ -14,8 +14,9 @@
     "chapters:status": "node scripts/chapter-system.mjs status",
     "chapters:sync": "node scripts/chapter-system.mjs sync",
     "chapters:check": "node scripts/chapter-system.mjs check",
+    "chapters:audit": "node --max-old-space-size=4096 --import tsx scripts/chapter-audit.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run chapters:check && npm run typecheck && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs tests/chapter-workflow.test.mjs && tsx --test tests/interactive-moves.test.ts",
+    "test": "npm run chapters:check && npm run typecheck && npm run build && node --test tests/prototype.test.mjs tests/stockfish-client.test.mjs tests/chapter-workflow.test.mjs && node --max-old-space-size=4096 --import tsx --test tests/interactive-moves.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

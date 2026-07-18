@@ -1,7 +1,7 @@
 /* Generated from app/content/chapters by `npm run chapters:sync`. */
 import type { ChapterSummary } from "./lib/markdown-chapter";
 
-export const CHAPTER_IDS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"] as const;
+export const CHAPTER_IDS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"] as const;
 export type ChapterId = (typeof CHAPTER_IDS)[number];
 
 export const CHAPTER_SUMMARIES = [
@@ -17,6 +17,8 @@ export const CHAPTER_SUMMARIES = [
   {"id":"10","label":"Chapter 10","title":"Chapter 10 — Catalan 4...dxc4: 5...a6 and 6...Nc6","pageCount":12},
   {"id":"11","label":"Chapter 11","title":"Chapter 11 — Catalan 4...dxc4: 5...Nc6","pageCount":23},
   {"id":"12","label":"Chapter 12","title":"Chapter 12 — Catalan 4...Bb4+: Various 5th Moves","pageCount":11},
+  {"id":"13","label":"Chapter 13","title":"Chapter 13 — Catalan 4...Bb4+: Introduction to 5...Be7","pageCount":16},
+  {"id":"14","label":"Chapter 14","title":"Chapter 14 – Catalan 4...Bb4+ 5...Be7 – Main Line","pageCount":32},
 ] as const satisfies readonly ChapterSummary[];
 
 export function isChapterId(id: string): id is ChapterId {

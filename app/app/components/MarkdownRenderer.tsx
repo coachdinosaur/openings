@@ -118,9 +118,10 @@ function renderFormatted(template: string, tokens: MarkdownMoveToken[], onMove: 
 }
 
 function renderInline(text: string, resolver: MarkdownMoveResolver, onMove: MoveHandler, key: string): ReactNode[] {
-  const tokens = resolver.resolveText(text);
-  if (tokens.length === 0) return renderFormatted(text, tokens, onMove, key);
-  let template = text;
+  const visibleText = text.replace(/<!--[\s\S]*?-->/g, "");
+  const tokens = resolver.resolveText(visibleText);
+  if (tokens.length === 0) return renderFormatted(visibleText, tokens, onMove, key);
+  let template = visibleText;
   for (let index = tokens.length - 1; index >= 0; index--) {
     const token = tokens[index];
     template = `${template.slice(0, token.index)}\uE000${index}\uE001${template.slice(token.index + token.display.length)}`;
