@@ -3,6 +3,7 @@
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Chess } from "chess.js";
 import { useRouter } from "next/navigation";
+import appIcon from "../app_icon_chess_study.png";
 import LessonLoading from "./LessonLoading";
 import { Chessboard } from "./components/Chessboard";
 import { MarkdownChapterView } from "./components/MarkdownRenderer";
@@ -236,7 +237,7 @@ export default function CatalanApp({ chapter, chapters }: { chapter: MarkdownCha
     <header className="topbar">
       <button className="sidebar-toggle desktop-sidebar-toggle" onClick={() => setSidebarCollapsed((current) => !current)} aria-label={sidebarCollapsed ? "Show navigation" : "Hide navigation"}>☰</button>
       <button className="sidebar-toggle menu-button" onClick={() => setMenuOpen((current) => !current)} aria-label="Toggle navigation">☰</button>
-      <a className="brand" href={`/chapters/${chapter.id}`}><span className="brand-mark">C</span><span><strong>Catalan Atelier</strong><small>Chapter {chapter.chapterNumber}</small></span></a>
+      <a className="brand" href={`/chapters/${chapter.id}`}><span className="brand-mark" aria-hidden="true" style={{ backgroundColor: "transparent", backgroundImage: `url(${appIcon.src})`, backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundSize: "contain", overflow: "hidden" }} /><span><strong>Catalan Atelier</strong><small>Chapter {chapter.chapterNumber}</small></span></a>
     </header>
     <aside id="course-sidebar" className={`sidebar ${menuOpen ? "open" : ""}`}>
       <nav><p>Course</p>{chapters.map((summary) => <a className={`course-link ${summary.id === chapter.id ? "active" : ""}`} href={`/chapters/${summary.id}`} onClick={(event) => navigateChapter(event, summary)} key={summary.id}><span className="nav-glyph">{summary.id}</span><span>{summary.label}</span></a>)}</nav>
