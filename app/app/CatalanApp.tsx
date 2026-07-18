@@ -73,6 +73,8 @@ function LessonReader({ chapter }: { chapter: MarkdownChapter }) {
     setEngineAnalysis(null);
   }, []);
 
+  const pageColumnRef = useRef<HTMLElement>(null);
+
   const selectPage = useCallback((nextIndex: number) => {
     const clamped = Math.max(0, Math.min(nextIndex, chapter.pages.length - 1));
     const page = chapter.pages[clamped];
@@ -81,6 +83,16 @@ function LessonReader({ chapter }: { chapter: MarkdownChapter }) {
     setNavigation(initialNavigation(page.markdown));
     setAnalysisMoves([]);
     setEngineAnalysis(null);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = pageColumnRef.current;
+        if (!el) return;
+        const topbar = document.querySelector<HTMLElement>(".topbar");
+        const offset = topbar?.offsetHeight ?? 78;
+        const y = el.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo(0, y);
+      });
+    });
   }, [chapter.pages]);
 
   const applyAnalysisMove = useCallback((input: BoardMoveInput) => {
@@ -196,7 +208,7 @@ function LessonReader({ chapter }: { chapter: MarkdownChapter }) {
         </div>
         <div className="active-line"><span>{analysisMoves.length ? "Analysis from" : "Markdown line"}</span><strong>{currentStep.label}</strong><small>{navigation.steps.length - 1} navigable {navigation.steps.length === 2 ? "move" : "moves"} in this line</small></div>
       </aside>
-      <section className="lesson-page-column" aria-label={`Chapter ${chapter.chapterNumber}, page ${currentPage?.number ?? pageIndex + 1}`}>
+      <section className="lesson-page-column" ref={pageColumnRef} aria-label={`Chapter ${chapter.chapterNumber}, page ${currentPage?.number ?? pageIndex + 1}`}>
         <PageControls page={pageIndex} pageNumber={currentPage?.number ?? pageIndex + 1} pageCount={chapter.pages.length} onChange={selectPage} />
         <MarkdownChapterView markdown={currentPage?.markdown ?? chapter.markdown} onMove={selectNavigation} activeNavigation={navigation} />
         <PageControls page={pageIndex} pageNumber={currentPage?.number ?? pageIndex + 1} pageCount={chapter.pages.length} onChange={selectPage} />
