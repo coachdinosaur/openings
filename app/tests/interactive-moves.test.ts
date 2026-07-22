@@ -178,7 +178,7 @@ function tokensForExactLine(markdown: string, exactLine: string) {
 }
 
 test("every published Markdown chapter contains navigable move lines", async () => {
-  for (let chapter = 1; chapter <= 14; chapter++) {
+  for (let chapter = 1; chapter <= 15; chapter++) {
     const markdown = await readFile(new URL(`../app/content/chapters/chapter-${chapter}-catalan.md`, import.meta.url), "utf8");
     const audit = auditMarkdown(markdown);
     assert.ok(audit.total >= 25, `Chapter ${chapter} should contain substantial chess notation`);
@@ -360,6 +360,112 @@ test("Chapter 14 keeps PDF-confirmed transcription corrections and explicit sour
   assert.equal(markdown.match(/SOURCE MOVE REFERENCE/g)?.length, 3);
   assert.match(markdown, /17\.\.\.h6 18\.f3 b4 19\.h4/);
   assert.match(markdown, /18\.\.\.b4\?\*\* runs into \*\*19\.a3! Na5 20\.Qe3 Rc2 21\.Rd2±/);
+});
+
+test("Chapter 15 locks PDF page and diagram parity with zero unresolved analysis sequences", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-15-catalan.md", import.meta.url), "utf8");
+  const result = auditChapterMarkdown(markdown, {
+    chapter: 15,
+    expectedPages: 24,
+    expectedDiagrams: 67,
+    strictMoves: true,
+  });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.pageAudits.map((page) => page.visibleFens), [4, 3, 2, 4, 3, 2, 2, 3, 3, 3, 3, 3, 2, 3, 2, 2, 3, 4, 3, 3, 4, 3, 3, 0]);
+  assert.ok(result.pageAudits.every((page) => page.unresolvedAnalysis === 0));
+});
+
+test("Chapter 15 preserves its variation hierarchy and conclusion", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-15-catalan.md", import.meta.url), "utf8");
+  const pages = extractPages(markdown);
+  assert.equal(pages.length, 24);
+  for (const heading of [
+    "### A) 6...c6",
+    "### B) 6...Nbd7 7.Qc2",
+    "#### B1) 7...b6 8.cxd5",
+    "##### B11) 8...Nxd5 9.a3",
+    "##### B12) 8...exd5",
+    "#### B2) 7...c6",
+    "##### B21) 9...dxe4 10.Nxe4",
+    "##### B22) 9...Bb7",
+    "##### B221) 11...exd5",
+    "##### B222) 11...cxd5 12.Re1",
+    "##### B2221) 12...Ba6 13.Nf1",
+    "##### B2222) 12...Qc7",
+    "##### B2223) 12...Rc8 13.Qa4",
+    "##### B23) 9...Ba6",
+    "##### B231) 13...Re8",
+    "##### B232) 13...cxd4 14.Nxd4",
+    "### Conclusion",
+  ]) assert.ok(markdown.includes(heading), `missing hierarchy heading: ${heading}`);
+
+  const index = pages[0].markdown;
+  assert.match(index, /^A\) 6\.\.\.c6/m);
+  assert.match(index, /^ {4}B1\)/m);
+  assert.match(index, /^ {8}B11\)/m);
+  assert.match(index, /^ {8}B22\)/m);
+  assert.match(index, /^ {12}B221\)/m);
+  assert.match(index, /^ {16}B2221\)/m);
+  assert.match(index, /^ {12}B231\)/m);
+  assert.ok(pages[22].markdown.includes("### Conclusion"));
+});
+
+test("Chapter 15 deep branches remain navigable and isolated from their siblings", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-15-catalan.md", import.meta.url), "utf8");
+  const pages = extractPages(markdown);
+  const cases = [
+    [6, "##### B11) 8...Nxd5 9.a3"],
+    [7, "##### B12) 8...exd5"],
+    [10, "##### B221) 11...exd5"],
+    [12, "##### B222) 11...cxd5 12.Re1"],
+    [13, "##### B2221) 12...Ba6 13.Nf1"],
+    [14, "##### B2222) 12...Qc7"],
+    [16, "##### B2223) 12...Rc8 13.Qa4"],
+    [21, "##### B231) 13...Re8"],
+    [22, "##### B232) 13...cxd4 14.Nxd4"],
+  ] as const;
+  const paths = cases.map(([pageNumber, line]) => {
+    const page = pages.find((candidate) => candidate.number === pageNumber);
+    assert.ok(page);
+    const tokens = tokensForExactLine(page.markdown, line);
+    assert.ok(tokens.length > 0);
+    assert.deepEqual(tokens.filter((token) => !token.navigation).map((token) => token.display), []);
+    const navigation = tokens.at(-1)?.navigation;
+    assert.ok(navigation);
+    return navigation.steps;
+  });
+  assert.notEqual(paths[0].at(-1)?.fen, paths[1].at(-1)?.fen, "B11 and B12 must end in different positions");
+  assert.notEqual(paths[4].at(-1)?.fen, paths[5].at(-1)?.fen, "B2221 and B2222 must end in different positions");
+  assert.notEqual(paths[5].at(-1)?.fen, paths[6].at(-1)?.fen, "B2222 and B2223 must end in different positions");
+  assert.notEqual(paths[7].at(-1)?.fen, paths[8].at(-1)?.fen, "B231 and B232 must end in different positions");
+  assert.ok(!paths[4].some((step) => step.label.includes("12...Qc7")), "B2221 must not inherit B2222");
+  assert.ok(!paths[7].some((step) => step.label.includes("13...cxd4")), "B231 must not inherit B232");
+});
+
+test("Chapter 15 keeps PDF-confirmed transcription corrections and its strategic source exception", async () => {
+  const markdown = await readFile(new URL("../app/content/chapters/chapter-15-catalan.md", import.meta.url), "utf8");
+  for (const expected of [
+    "20.Qb3!",
+    "20.Rxc4 Qxb7 21.Bxb7",
+    "24.Qb3",
+    "22.Rb1!",
+    "14...a6 15.Bd3 Nb8",
+    "16...Rb8 17.Bd3",
+    "Nh3+ 22.Kf1",
+    "20.Bxb5 Qxb5 21.Rac1",
+    "20.exf6 Nexf6∞",
+  ]) assert.ok(markdown.includes(expected), `missing PDF-confirmed notation: ${expected}`);
+  for (const rejected of [
+    "20.Qh3!",
+    "20.Rxc4 Rxb7 21.Rxb7",
+    "14...Ba6 15.Bd3 Nb8",
+    "16...Qb8 17.Bd3",
+    "Nh3+ 22.Bf1",
+    "20.Qxb5 Qxb5 21.Rac1",
+    "20.exf6 Nxf6∞",
+  ]) assert.ok(!markdown.includes(rejected), `retained conversion error: ${rejected}`);
+  assert.equal(markdown.match(/SOURCE MOVE REFERENCE/g)?.length, 1);
+  assert.match(markdown, /strong positional plan of \*\*Ne5-c4-d6\*\*/);
 });
 
 test("Chapter 12 keeps its legal source variations linked on their rendered pages", async () => {
@@ -593,7 +699,7 @@ test("the active Markdown move stays marked while arrow navigation walks its lin
 
 test("source-audited chapters expose every PDF diagram as a visible FEN board", async () => {
   const expectedDiagramCounts = new Map([
-    [1, 47], [2, 25], [3, 44], [4, 33], [5, 32], [6, 43], [7, 73], [8, 37], [12, 34], [13, 46], [14, 97],
+    [1, 47], [2, 25], [3, 44], [4, 33], [5, 32], [6, 43], [7, 73], [8, 37], [12, 34], [13, 46], [14, 97], [15, 67],
   ]);
 
   for (const [chapter, expectedCount] of expectedDiagramCounts) {
